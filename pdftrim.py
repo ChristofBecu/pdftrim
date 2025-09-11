@@ -16,6 +16,92 @@ import fitz  # PyMuPDF for more advanced PDF manipulation
 DEBUG = False
 
 
+def is_page_blank(page) -> bool:
+    """
+    Check if a page is blank or contains only decorative content without meaningful text.
+    
+    Args:
+        page: A fitz page object
+        
+    Returns:
+        True if the page is blank, False otherwise
+    """
+    # Get all text from the page
+    text = page.get_text().strip()
+    meaningful_text = text.replace(' ', '').replace('\n', '').replace('\t', '')
+    
+    # If there's substantial meaningful text content, it's definitely not blank
+    if len(meaningful_text) > 20:
+        return False
+    
+    # Check for text blocks - more reliable than raw text
+    text_blocks = page.get_text('blocks')
+    substantial_text_blocks = [block for block in text_blocks if len(block[4].strip()) > 10]
+    
+    if substantial_text_blocks:
+        if DEBUG:
+            print(f"[DEBUG] Page has {len(substantial_text_blocks)} substantial text blocks")
+        return False
+    
+    # If we get here, there's no substantial text content
+    # The page might have decorative elements but no meaningful content
+    
+    # Get page dimensions for analysis
+    rect = page.rect
+    page_area = rect.width * rect.height
+    
+    drawings = page.get_drawings()
+    images = page.get_images()
+    
+    # Special case: if there's no text AND it's likely a template/decorative page
+    if len(meaningful_text) == 0:
+        # Even with images/drawings, if there's absolutely no text, 
+        # it's likely a blank template page
+        if DEBUG:
+            print(f"[DEBUG] Page has no text content - Text: '{text}', Drawings: {len(drawings)}, Images: {len(images)}")
+        return True
+    
+    # If there's minimal text (1-20 chars), check if it's just page numbers or similar
+    if len(meaningful_text) <= 20:
+        # Check if the text is just numbers, dates, or other minimal content
+        if text.replace(' ', '').replace('\n', '').isdigit() or len(text.strip()) < 5:
+            if DEBUG:
+                print(f"[DEBUG] Page has only minimal text content: '{text}'")
+            return True
+    
+    # If we get here, there's some text content, so keep the page
+    return False
+
+
+def remove_blank_pages(doc) -> int:
+    """
+    Remove blank pages from a PDF document.
+    
+    Args:
+        doc: A fitz document object
+        
+    Returns:
+        Number of blank pages removed
+    """
+    blank_pages = []
+    
+    # Identify blank pages (iterate in reverse to avoid index issues when deleting)
+    for page_num in range(len(doc) - 1, -1, -1):
+        page = doc[page_num]
+        if is_page_blank(page):
+            blank_pages.append(page_num)
+            if DEBUG:
+                print(f"[DEBUG] Found blank page: {page_num}")
+    
+    # Remove blank pages
+    for page_num in blank_pages:
+        doc.delete_page(page_num)
+        if DEBUG:
+            print(f"[DEBUG] Removed blank page: {page_num}")
+    
+    return len(blank_pages)
+
+
 def extract_page_text(page_layout) -> list[str]:
     """Extract text lines from a PDF page layout."""
     lines = []
@@ -76,6 +162,7 @@ def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int
 def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, y_cutoff: float) -> None:
     """
     Trim content from a specific page at the given Y-coordinate and remove all subsequent pages.
+    Also removes any blank pages from the final document.
     """
     doc = fitz.open(input_file)
     
@@ -100,6 +187,12 @@ def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, 
         
         # Copy the page content but clip it to remove content below y_cutoff
         new_page.show_pdf_page(new_page.rect, doc, page_num, clip=clip_rect)
+    
+    # Remove blank pages from the final document
+    blank_pages_removed = remove_blank_pages(new_doc)
+    
+    if DEBUG and blank_pages_removed > 0:
+        print(f"[DEBUG] Removed {blank_pages_removed} blank page(s)")
     
     # Save the modified document
     new_doc.save(output_file)
@@ -128,22 +221,22 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
         position_result = find_text_position_pymupdf(input_file, search_string)
         
         if position_result is None:
-            # If search string not found, copy the entire PDF
+            # If search string not found, copy the entire PDF but still remove blank pages
             if DEBUG:
-                print(f"[DEBUG] Search string not found, copying entire PDF")
+                print(f"[DEBUG] Search string not found, copying entire PDF and removing blank pages")
             
-            # Just copy the original file
-            reader = PdfReader(input_file)
-            writer = PdfWriter()
-            
-            for page in reader.pages:
-                writer.add_page(page)
+            # Use PyMuPDF to handle blank page removal
+            doc = fitz.open(input_file)
+            blank_pages_removed = remove_blank_pages(doc)
             
             output_file = create_output_filename(input_file, output_dir)
-            with open(output_file, "wb") as f:
-                writer.write(f)
+            doc.save(output_file)
+            doc.close()
             
-            print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (no trim needed)")
+            if blank_pages_removed > 0:
+                print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (no trim needed, removed {blank_pages_removed} blank page(s))")
+            else:
+                print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (no changes needed)")
             return True
         
         page_num, y_coord = position_result
@@ -155,7 +248,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
         output_file = create_output_filename(input_file, output_dir)
         trim_page_content_pymupdf(input_file, output_file, page_num, y_coord)
         
-        print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (trimmed at page {page_num + 1})")
+        print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (trimmed at page {page_num + 1}, blank pages removed)")
         return True
         
     except Exception as e:
