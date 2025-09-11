@@ -9,7 +9,8 @@ import glob
 from pathlib import Path
 from PyPDF2 import PdfReader, PdfWriter
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTTextContainer
+from pdfminer.layout import LTTextContainer, LTTextBox, LTTextLine, LTChar
+import fitz  # PyMuPDF for more advanced PDF manipulation
 
 # Configuration
 DEBUG = False
@@ -39,30 +40,127 @@ def debug_pdfminer_first_lines(input_file: str) -> None:
         print(f"[DEBUG] pdfminer page {page_num}: {first_line}")
 
 
-def find_cutoff_page_pdfminer(input_file: str, search_string: str) -> int | None:
+def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int, float] | None:
     """
-    Find the page number where the search string first appears.
-    Returns the page number (0-indexed) or None if not found.
+    Find the page number and Y-coordinate where the search string appears.
+    Returns (page_num, y_coordinate) or None if not found.
     """
     if DEBUG:
-        print(f"[DEBUG] Using pdfminer.six to find cutoff page for: '{search_string}'")
+        print(f"[DEBUG] Using PyMuPDF to find text position for: '{search_string}'")
     
-    for page_num, page_layout in enumerate(extract_pages(input_file)):
-        lines = extract_page_text(page_layout)
-        page_text = '\n'.join(lines)
-        first_line = lines[0] if lines else "[NO TEXT]"
+    doc = fitz.open(input_file)
+    
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        
+        # Search for the text on this page
+        text_instances = page.search_for(search_string)
+        
+        if text_instances:
+            # Get the first occurrence
+            rect = text_instances[0]
+            y_coord = rect.y0  # Top Y coordinate of the text
+            
+            if DEBUG:
+                print(f"[DEBUG] Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
+            
+            doc.close()
+            return page_num, y_coord
+    
+    doc.close()
+    if DEBUG:
+        print(f"[DEBUG] Text '{search_string}' not found in document")
+    return None
+
+
+def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, y_cutoff: float) -> None:
+    """
+    Trim content from a specific page at the given Y-coordinate and remove all subsequent pages.
+    """
+    doc = fitz.open(input_file)
+    
+    # Create a new document with pages up to the cutoff page
+    new_doc = fitz.open()
+    
+    # Copy all pages before the cutoff page
+    for i in range(page_num):
+        page = doc[i]
+        new_doc.insert_pdf(doc, from_page=i, to_page=i)
+    
+    # Process the cutoff page - remove content below y_cutoff
+    if page_num < len(doc):
+        page = doc[page_num]
+        page_rect = page.rect
+        
+        # Create a clipping rectangle that keeps only content above y_cutoff
+        clip_rect = fitz.Rect(page_rect.x0, page_rect.y0, page_rect.x1, y_cutoff)
+        
+        # Create a new page in the output document
+        new_page = new_doc.new_page(width=page_rect.width, height=page_rect.height)
+        
+        # Copy the page content but clip it to remove content below y_cutoff
+        new_page.show_pdf_page(new_page.rect, doc, page_num, clip=clip_rect)
+    
+    # Save the modified document
+    new_doc.save(output_file)
+    new_doc.close()
+    doc.close()
+
+
+def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> bool:
+    """
+    Advanced PDF trimming that can remove content from the middle of a page.
+    
+    Args:
+        input_file: Path to input PDF file
+        search_string: String to search for as cutoff point
+        output_dir: Directory to save the output file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        if DEBUG:
+            print(f"[DEBUG] Processing: {input_file}")
+            print(f"[DEBUG] Search string: '{search_string}'")
+        
+        # Find the position of the search string
+        position_result = find_text_position_pymupdf(input_file, search_string)
+        
+        if position_result is None:
+            # If search string not found, copy the entire PDF
+            if DEBUG:
+                print(f"[DEBUG] Search string not found, copying entire PDF")
+            
+            # Just copy the original file
+            reader = PdfReader(input_file)
+            writer = PdfWriter()
+            
+            for page in reader.pages:
+                writer.add_page(page)
+            
+            output_file = create_output_filename(input_file, output_dir)
+            with open(output_file, "wb") as f:
+                writer.write(f)
+            
+            print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (no trim needed)")
+            return True
+        
+        page_num, y_coord = position_result
         
         if DEBUG:
-            print(f"[DEBUG] pdfminer page {page_num}: {first_line}")
+            print(f"[DEBUG] Will trim page {page_num} at Y-coordinate {y_coord}")
         
-        if search_string in page_text:
-            if DEBUG:
-                print(f"[DEBUG] pdfminer found search string on page {page_num}")
-            return page_num
-    
-    if DEBUG:
-        print(f"[DEBUG] pdfminer did not find search string; keeping all pages")
-    return None
+        # Create output filename and trim the PDF
+        output_file = create_output_filename(input_file, output_dir)
+        trim_page_content_pymupdf(input_file, output_file, page_num, y_coord)
+        
+        print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (trimmed at page {page_num + 1})")
+        return True
+        
+    except Exception as e:
+        print(f"✗ Error processing {os.path.basename(input_file)}: {e}")
+        return False
 
 
 def create_output_filename(input_file: str, output_dir: str) -> str:
@@ -88,7 +186,8 @@ def find_pdf_files(directory: str = ".") -> list[str]:
 
 def trim_pdf(input_file: str, search_string: str, output_dir: str) -> bool:
     """
-    Trim PDF by removing all pages starting from where search_string is found.
+    Trim PDF by removing content starting from where search_string is found.
+    This version can trim content from the middle of a page.
     
     Args:
         input_file: Path to input PDF file
@@ -98,48 +197,7 @@ def trim_pdf(input_file: str, search_string: str, output_dir: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        if DEBUG:
-            print(f"[DEBUG] Processing: {input_file}")
-            print(f"[DEBUG] Search string: '{search_string}'")
-        
-        # Load PDF
-        reader = PdfReader(input_file)
-        if DEBUG:
-            print(f"[DEBUG] Number of pages in PDF: {len(reader.pages)}")
-        
-        writer = PdfWriter()
-        
-        # Find where to cut off
-        cutoff_page = find_cutoff_page_pdfminer(input_file, search_string)
-        if cutoff_page is None:
-            cutoff_page = len(reader.pages)
-        
-        if DEBUG:
-            print(f"[DEBUG] Final cutoff_page: {cutoff_page}")
-        
-        # Copy pages up to cutoff
-        for i in range(cutoff_page):
-            if DEBUG:
-                print(f"[DEBUG] Adding page {i} to output PDF")
-            writer.add_page(reader.pages[i])
-        
-        # Create output filename and save
-        output_file = create_output_filename(input_file, output_dir)
-        if DEBUG:
-            print(f"[DEBUG] Output file will be: {output_file}")
-        
-        with open(output_file, "wb") as f:
-            if DEBUG:
-                print(f"[DEBUG] Writing output PDF...")
-            writer.write(f)
-        
-        print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)}")
-        return True
-        
-    except Exception as e:
-        print(f"✗ Error processing {os.path.basename(input_file)}: {e}")
-        return False
+    return trim_pdf_advanced(input_file, search_string, output_dir)
 
 
 def parse_arguments() -> tuple[str, str]:
