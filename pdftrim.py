@@ -15,6 +15,7 @@ import fitz  # PyMuPDF for more advanced PDF manipulation
 # Import our custom classes
 from src.models.page import Page
 from src.models.pdf_document import PDFDocument
+from src.models.text_search_engine import TextSearchEngine
 from src.config.settings import config
 
 # Configuration is now handled by the config object
@@ -73,27 +74,6 @@ def debug_pdfminer_first_lines(input_file: str) -> None:
         print(f"[DEBUG] pdfminer page {page_num}: {first_line}")
 
 
-def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int, float] | None:
-    """
-    Find the page number and Y-coordinate where the search string appears.
-    Returns (page_num, y_coordinate) or None if not found.
-    """
-    if config.debug_mode:
-        print(f"[DEBUG] Using PyMuPDF to find text position for: '{search_string}'")
-    
-    with PDFDocument(input_file) as doc:
-        result = doc.find_first_text_position(search_string)
-        
-        if result:
-            page_num, y_coord = result
-            if config.debug_mode:
-                print(f"[DEBUG] Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
-            return page_num, y_coord
-        else:
-            if config.debug_mode:
-                print(f"[DEBUG] Text '{search_string}' not found in document")
-            return None
-
 
 def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, y_cutoff: float) -> None:
     """
@@ -149,8 +129,9 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
             print(f"[DEBUG] Processing: {input_file}")
             print(f"[DEBUG] Search string: '{search_string}'")
         
-        # Find the position of the search string
-        position_result = find_text_position_pymupdf(input_file, search_string)
+        # Find the position of the search string using TextSearchEngine
+        search_engine = TextSearchEngine(debug=config.debug_mode)
+        position_result = search_engine.find_text_position(input_file, search_string)
         
         if position_result is None:
             # If search string not found, copy the entire PDF but still remove blank pages
