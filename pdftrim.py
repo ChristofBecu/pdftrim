@@ -3,24 +3,17 @@
 PDF Trimmer - Removes pages from a PDF starting at a specific search string.
 """
 
-import glob
 from pathlib import Path
-from PyPDF2 import PdfReader, PdfWriter
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTTextBox, LTTextLine, LTChar
-import fitz  # PyMuPDF for more advanced PDF manipulation
 
 # Import our custom classes
-from src.models.page import Page
 from src.models.pdf_document import PDFDocument
-from src.models.text_search_engine import TextSearchEngine
 from src.models.pdf_processor import PDFProcessor
-from src.utils.file_manager import FileManager
 from src.cli.cli_handler import CLIHandler
 from src.config.settings import config
+from src.workflow.workflow_manager import WorkflowManager
 from src.ui.display_manager import DisplayManager, DisplayConfig
-
-# Configuration is now handled by the config object
 
 # Initialize a global DisplayManager for functions that need debug output
 display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
@@ -38,17 +31,9 @@ def trim_pdf(input_file: str, search_string: str, output_dir: str | None = None)
     Returns:
         True if processing was successful, False otherwise
     """
-    # Initialize processor
-    processor = PDFProcessor(debug=config.debug_mode)
-    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
-    
-    # Process the PDF using the processor (convert None to empty string for processor)
-    result = processor.process_pdf(input_file, search_string, output_dir or config.output_dir)
-    
-    # Display the result using CLI handler
-    cli_handler.display_result(result)
-    
-    return result.success
+    # Use WorkflowManager for consistent processing
+    workflow = WorkflowManager(display=display, debug=config.debug_mode)
+    return workflow.process_single_file(input_file, search_string, output_dir)
 
 
 def remove_blank_pages(doc: PDFDocument) -> int:
@@ -102,9 +87,6 @@ def debug_pdfminer_first_lines(input_file: str) -> None:
         display.debug(f"pdfminer page {page_num}: {first_line}")
 
 
-
-
-
 def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> bool:
     """
     Advanced PDF trimming that can remove content from the middle of a page.
@@ -134,56 +116,18 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
     return result.success
 
 
-
-
-
-
-
-
 def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     """Process all PDF files in the current directory."""
-    if output_dir is None:
-        output_dir = config.output_dir
-    
-    # Use FileManager for file discovery
-    file_manager = FileManager(debug=config.debug_mode)
-    pdf_files = file_manager.find_pdf_files()
-    
-    # Use CLIHandler for consistent display
-    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
-    
-    if not pdf_files:
-        cli_handler.display_no_files_found()
-        return
-    
-    cli_handler.display_file_list(pdf_files, f"Found {len(pdf_files)} PDF file(s) to process:")
-    cli_handler.display_processing_start(len(pdf_files), search_string, output_dir)
-    
-    successful = 0
-    failed = 0
-    
-    for pdf_file in pdf_files:
-        if trim_pdf(pdf_file, search_string, output_dir):
-            successful += 1
-        else:
-            failed += 1
-    
-    cli_handler.display_processing_complete(successful, failed)
+    # Use WorkflowManager for consistent processing
+    workflow = WorkflowManager(display=display, debug=config.debug_mode)
+    workflow.process_batch(search_string, output_dir)
 
 
 def process_single_pdf(input_pdf: str, search_string: str, output_dir: str | None = None) -> None:
     """Process a single PDF file."""
-    if output_dir is None:
-        output_dir = config.output_dir
-    
-    # Use CLIHandler for consistent display
-    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
-    cli_handler.display_processing_start(1, search_string, output_dir)
-    
-    if trim_pdf(input_pdf, search_string, output_dir):
-        cli_handler.display_processing_complete(1, 0)
-    else:
-        cli_handler.display_processing_complete(0, 1)
+    # Use WorkflowManager for consistent processing
+    workflow = WorkflowManager(display=display, debug=config.debug_mode)
+    workflow.process_single_file(input_pdf, search_string, output_dir)
 
 
 def main() -> None:
@@ -194,12 +138,14 @@ def main() -> None:
     # Parse command line arguments
     args = cli_handler.handle_arguments()
     
-    if args.is_batch_mode:
-        # Process all PDFs in current directory
-        process_all_pdfs(args.search_string)
-    else:
-        # Process single PDF
-        process_single_pdf(args.input_path, args.search_string)
+    # Use WorkflowManager for processing
+    workflow = WorkflowManager(display=display, debug=config.debug_mode)
+    workflow.process_workflow(
+        input_path=args.input_path if not args.is_batch_mode else None,
+        search_string=args.search_string,
+        output_dir=args.output_dir,
+        is_batch_mode=args.is_batch_mode
+    )
 
 
 
