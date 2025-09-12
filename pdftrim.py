@@ -17,6 +17,7 @@ from src.models.page import Page
 from src.models.pdf_document import PDFDocument
 from src.models.text_search_engine import TextSearchEngine
 from src.models.pdf_processor import PDFProcessor
+from src.utils.file_manager import FileManager
 from src.config.settings import config
 
 # Configuration is now handled by the config object
@@ -107,11 +108,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
 
 
 
-def find_pdf_files(directory: str = ".") -> list[str]:
-    """Find all PDF files in the given directory."""
-    pdf_pattern = os.path.join(directory, config.pdf_pattern)
-    pdf_files = glob.glob(pdf_pattern)
-    return [f for f in pdf_files if not f.endswith(config.processed_suffix)]  # Skip already processed files
+
 
 
 def trim_pdf(input_file: str, search_string: str, output_dir: str) -> bool:
@@ -147,11 +144,6 @@ def parse_arguments() -> tuple[str, str]:
         input_pdf = sys.argv[1]
         search_str = sys.argv[2]
         
-        # Validate input file exists
-        if not os.path.exists(input_pdf):
-            print(f"Error: Input file '{input_pdf}' does not exist.")
-            sys.exit(1)
-        
         return input_pdf, search_str
 
 
@@ -159,8 +151,10 @@ def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     """Process all PDF files in the current directory."""
     if output_dir is None:
         output_dir = config.output_dir
-        
-    pdf_files = find_pdf_files()
+    
+    # Use FileManager for file discovery
+    file_manager = FileManager(debug=config.debug_mode)
+    pdf_files = file_manager.find_pdf_files()
     
     if not pdf_files:
         print("No PDF files found in current directory.")

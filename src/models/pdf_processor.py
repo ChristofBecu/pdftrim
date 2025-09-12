@@ -13,6 +13,7 @@ import fitz  # PyMuPDF
 from .pdf_document import PDFDocument
 from .text_search_engine import TextSearchEngine
 from ..config.settings import config
+from ..utils.file_manager import FileManager, FileValidationError
 
 
 class ProcessingResult:
@@ -50,7 +51,7 @@ class PDFProcessor:
     removal to provide a complete PDF trimming workflow.
     """
     
-    def __init__(self, debug: bool = None):
+    def __init__(self, debug: Optional[bool] = None):
         """
         Initialize the PDFProcessor.
         
@@ -59,6 +60,7 @@ class PDFProcessor:
         """
         self.debug = debug if debug is not None else config.debug_mode
         self.search_engine = TextSearchEngine(debug=self.debug)
+        self.file_manager = FileManager(debug=self.debug)
     
     def process_pdf(self, input_file: Union[str, Path], search_string: str, 
                    output_dir: Union[str, Path]) -> ProcessingResult:
@@ -73,35 +75,39 @@ class PDFProcessor:
         Returns:
             ProcessingResult object with details about the operation
         """
-        input_file = str(input_file)
-        output_dir = str(output_dir)
-        
         try:
+            # Validate input file using FileManager
+            validated_input = self.file_manager.validate_input_file(input_file)
+            validated_output_dir = self.file_manager.ensure_output_directory(output_dir)
+            
             if self.debug:
-                print(f"[DEBUG] Processing: {input_file}")
+                print(f"[DEBUG] Processing: {validated_input}")
                 print(f"[DEBUG] Search string: '{search_string}'")
             
-            # Ensure output directory exists
-            self._ensure_output_directory(output_dir)
-            
             # Find the position of the search string
-            position_result = self.search_engine.find_text_position(input_file, search_string)
+            position_result = self.search_engine.find_text_position(validated_input, search_string)
             
-            # Generate output filename
-            output_file = self._create_output_filename(input_file, output_dir)
+            # Generate output filename using FileManager
+            output_file = self.file_manager.create_output_filename(validated_input, validated_output_dir)
             
             if position_result is None:
                 # Search string not found - copy entire PDF but remove blank pages
-                return self._process_without_trimming(input_file, output_file)
+                return self._process_without_trimming(validated_input, output_file)
             else:
                 # Search string found - trim at that position
                 page_num, y_coord = position_result
-                return self._process_with_trimming(input_file, output_file, page_num, y_coord)
+                return self._process_with_trimming(validated_input, output_file, page_num, y_coord)
                 
+        except FileValidationError as e:
+            return ProcessingResult(
+                success=False,
+                input_file=str(input_file),
+                message=str(e)
+            )
         except Exception as e:
             return ProcessingResult(
                 success=False,
-                input_file=input_file,
+                input_file=str(input_file),
                 message=str(e)
             )
     
@@ -243,31 +249,7 @@ class PDFProcessor:
         
         return len(blank_pages)
     
-    def _create_output_filename(self, input_file: str, output_dir: str) -> str:
-        """
-        Generate output filename in the specified output directory.
-        
-        Args:
-            input_file: Path to input PDF file
-            output_dir: Output directory path
-            
-        Returns:
-            Full path to output file
-        """
-        return config.create_output_filename(input_file, output_dir)
-    
-    def _ensure_output_directory(self, output_dir: str) -> None:
-        """
-        Create output directory if it doesn't exist.
-        
-        Args:
-            output_dir: Directory path to create
-        """
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            if self.debug:
-                print(f"[DEBUG] Created output directory: {output_dir}")
-    
+
     def batch_process(self, input_files: list[Union[str, Path]], search_string: str, 
                      output_dir: Union[str, Path]) -> list[ProcessingResult]:
         """
