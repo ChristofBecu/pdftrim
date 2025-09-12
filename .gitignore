@@ -82,3 +82,6 @@ tmp/
 # OS generated files
 Thumbs.db
 .DS_Store
+
+# Planning files
+planning/

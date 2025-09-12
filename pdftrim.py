@@ -14,32 +14,18 @@ import fitz  # PyMuPDF for more advanced PDF manipulation
 
 # Import our custom classes
 from src.models.page import Page
+from src.models.pdf_document import PDFDocument
 from src.config.settings import config
 
 # Configuration is now handled by the config object
 
 
-def is_page_blank(page) -> bool:
-    """
-    Check if a page is blank or contains only decorative content without meaningful text.
-    
-    Args:
-        page: A fitz page object
-        
-    Returns:
-        True if the page is blank, False otherwise
-    """
-    # Create a Page wrapper and use its is_blank method
-    page_wrapper = Page(page, debug=config.debug_mode)
-    return page_wrapper.is_blank()
-
-
-def remove_blank_pages(doc) -> int:
+def remove_blank_pages(doc: PDFDocument) -> int:
     """
     Remove blank pages from a PDF document.
     
     Args:
-        doc: A fitz document object
+        doc: A PDFDocument object
         
     Returns:
         Number of blank pages removed
@@ -49,7 +35,7 @@ def remove_blank_pages(doc) -> int:
     # Identify blank pages (iterate in reverse to avoid index issues when deleting)
     for page_num in range(len(doc) - 1, -1, -1):
         page = doc[page_num]
-        if is_page_blank(page):
+        if page.is_blank():
             blank_pages.append(page_num)
             if config.debug_mode:
                 print(f"[DEBUG] Found blank page: {page_num}")
@@ -95,29 +81,18 @@ def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int
     if config.debug_mode:
         print(f"[DEBUG] Using PyMuPDF to find text position for: '{search_string}'")
     
-    doc = fitz.open(input_file)
-    
-    for page_num in range(len(doc)):
-        page = doc[page_num]
+    with PDFDocument(input_file) as doc:
+        result = doc.find_first_text_position(search_string)
         
-        # Search for the text on this page
-        text_instances = page.search_for(search_string)
-        
-        if text_instances:
-            # Get the first occurrence
-            rect = text_instances[0]
-            y_coord = rect.y0  # Top Y coordinate of the text
-            
+        if result:
+            page_num, y_coord = result
             if config.debug_mode:
                 print(f"[DEBUG] Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
-            
-            doc.close()
             return page_num, y_coord
-    
-    doc.close()
-    if config.debug_mode:
-        print(f"[DEBUG] Text '{search_string}' not found in document")
-    return None
+        else:
+            if config.debug_mode:
+                print(f"[DEBUG] Text '{search_string}' not found in document")
+            return None
 
 
 def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, y_cutoff: float) -> None:
@@ -125,40 +100,35 @@ def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, 
     Trim content from a specific page at the given Y-coordinate and remove all subsequent pages.
     Also removes any blank pages from the final document.
     """
-    doc = fitz.open(input_file)
-    
-    # Create a new document with pages up to the cutoff page
-    new_doc = fitz.open()
-    
-    # Copy all pages before the cutoff page
-    for i in range(page_num):
-        page = doc[i]
-        new_doc.insert_pdf(doc, from_page=i, to_page=i)
-    
-    # Process the cutoff page - remove content below y_cutoff
-    if page_num < len(doc):
-        page = doc[page_num]
-        page_rect = page.rect
-        
-        # Create a clipping rectangle that keeps only content above y_cutoff
-        clip_rect = fitz.Rect(page_rect.x0, page_rect.y0, page_rect.x1, y_cutoff)
-        
-        # Create a new page in the output document
-        new_page = new_doc.new_page(width=page_rect.width, height=page_rect.height)
-        
-        # Copy the page content but clip it to remove content below y_cutoff
-        new_page.show_pdf_page(new_page.rect, doc, page_num, clip=clip_rect)
-    
-    # Remove blank pages from the final document
-    blank_pages_removed = remove_blank_pages(new_doc)
-    
-    if config.debug_mode and blank_pages_removed > 0:
-        print(f"[DEBUG] Removed {blank_pages_removed} blank page(s)")
-    
-    # Save the modified document
-    new_doc.save(output_file)
-    new_doc.close()
-    doc.close()
+    with PDFDocument(input_file) as source_doc:
+        with PDFDocument() as new_doc:  # Create empty document
+            
+            # Copy all pages before the cutoff page
+            for i in range(page_num):
+                new_doc.insert_pdf(source_doc, from_page=i, to_page=i)
+            
+            # Process the cutoff page - remove content below y_cutoff
+            if page_num < len(source_doc):
+                source_page = source_doc[page_num]
+                page_rect = source_page.rect
+                
+                # Create a clipping rectangle that keeps only content above y_cutoff
+                clip_rect = fitz.Rect(page_rect.x0, page_rect.y0, page_rect.x1, y_cutoff)
+                
+                # Create a new page in the output document
+                new_page = new_doc.new_page(width=page_rect.width, height=page_rect.height)
+                
+                # Copy the page content but clip it to remove content below y_cutoff
+                new_page.show_pdf_page(new_page.rect, source_doc._doc, page_num, clip=clip_rect)
+            
+            # Remove blank pages from the final document
+            blank_pages_removed = remove_blank_pages(new_doc)
+            
+            if config.debug_mode and blank_pages_removed > 0:
+                print(f"[DEBUG] Removed {blank_pages_removed} blank page(s)")
+            
+            # Save the modified document
+            new_doc.save(output_file)
 
 
 def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> bool:
@@ -186,13 +156,12 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
             if config.debug_mode:
                 print(f"[DEBUG] Search string not found, copying entire PDF and removing blank pages")
             
-            # Use PyMuPDF to handle blank page removal
-            doc = fitz.open(input_file)
-            blank_pages_removed = remove_blank_pages(doc)
-            
-            output_file = create_output_filename(input_file, output_dir)
-            doc.save(output_file)
-            doc.close()
+            # Use PDFDocument to handle blank page removal
+            with PDFDocument(input_file) as doc:
+                blank_pages_removed = remove_blank_pages(doc)
+                
+                output_file = create_output_filename(input_file, output_dir)
+                doc.save(output_file)
             
             if blank_pages_removed > 0:
                 print(f"✓ Processed: {os.path.basename(input_file)} -> {os.path.basename(output_file)} (no trim needed, removed {blank_pages_removed} blank page(s))")
