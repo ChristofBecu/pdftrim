@@ -12,6 +12,7 @@ from typing import List, Optional, Union, Tuple
 from pathlib import Path
 
 from ..config.settings import config
+from ..ui.display_manager import DisplayManager, DisplayConfig
 
 
 class FileValidationError(Exception):
@@ -27,14 +28,22 @@ class FileManager:
     directory management operations.
     """
     
-    def __init__(self, debug: Optional[bool] = None):
+    def __init__(self, debug: Optional[bool] = None, display_manager: Optional[DisplayManager] = None):
         """
         Initialize the FileManager.
         
         Args:
             debug: Enable debug logging (defaults to config.debug_mode if None)
+            display_manager: Optional DisplayManager for output formatting
         """
         self.debug = debug if debug is not None else config.debug_mode
+        
+        # Use provided DisplayManager or create a default one
+        if display_manager:
+            self.display = display_manager
+        else:
+            display_config = DisplayConfig(debug_enabled=self.debug)
+            self.display = DisplayManager(display_config)
     
     def find_pdf_files(self, directory: Union[str, Path] = ".") -> List[str]:
         """
@@ -49,19 +58,17 @@ class FileManager:
         directory = str(directory)
         pdf_pattern = os.path.join(directory, config.pdf_pattern)
         
-        if self.debug:
-            print(f"[DEBUG] Searching for PDFs with pattern: {pdf_pattern}")
+        self.display.debug(f"Searching for PDFs with pattern: {pdf_pattern}")
         
         pdf_files = glob.glob(pdf_pattern)
         
         # Filter out already processed files
         filtered_files = [f for f in pdf_files if not self._is_processed_file(f)]
         
-        if self.debug:
-            print(f"[DEBUG] Found {len(pdf_files)} total PDF files, {len(filtered_files)} unprocessed")
-            if len(pdf_files) > len(filtered_files):
-                skipped = len(pdf_files) - len(filtered_files)
-                print(f"[DEBUG] Skipped {skipped} already processed files")
+        self.display.debug(f"Found {len(pdf_files)} total PDF files, {len(filtered_files)} unprocessed")
+        if len(pdf_files) > len(filtered_files):
+            skipped = len(pdf_files) - len(filtered_files)
+            self.display.debug(f"Skipped {skipped} already processed files")
         
         return filtered_files
     
@@ -107,8 +114,7 @@ class FileManager:
         
         abs_path = os.path.abspath(filepath)
         
-        if self.debug:
-            print(f"[DEBUG] Validated input file: {abs_path}")
+        self.display.debug(f"Validated input file: {abs_path}")
         
         return abs_path
     
@@ -132,8 +138,7 @@ class FileManager:
         output_filename = f"{base}{config.output_suffix}{ext}"
         output_path = os.path.join(output_directory, output_filename)
         
-        if self.debug:
-            print(f"[DEBUG] Generated output filename: {output_path}")
+        self.display.debug(f"Generated output filename: {output_path}")
         
         return output_path
     
@@ -156,11 +161,9 @@ class FileManager:
         try:
             if not os.path.exists(abs_output_dir):
                 os.makedirs(abs_output_dir)
-                if self.debug:
-                    print(f"[DEBUG] Created output directory: {abs_output_dir}")
+                self.display.debug(f"Created output directory: {abs_output_dir}")
             else:
-                if self.debug:
-                    print(f"[DEBUG] Output directory already exists: {abs_output_dir}")
+                self.display.debug(f"Output directory already exists: {abs_output_dir}")
             
             # Verify directory is writable
             if not os.access(abs_output_dir, os.W_OK):
@@ -233,8 +236,7 @@ class FileManager:
             unique_path = os.path.join(directory, unique_name)
             
             if not os.path.exists(unique_path):
-                if self.debug:
-                    print(f"[DEBUG] Created unique output filename: {unique_path}")
+                self.display.debug(f"Created unique output filename: {unique_path}")
                 return unique_path
             
             counter += 1
@@ -262,11 +264,9 @@ class FileManager:
             try:
                 os.remove(temp_file)
                 removed_count += 1
-                if self.debug:
-                    print(f"[DEBUG] Removed temp file: {temp_file}")
+                self.display.debug(f"Removed temp file: {temp_file}")
             except OSError as e:
-                if self.debug:
-                    print(f"[DEBUG] Failed to remove temp file {temp_file}: {e}")
+                self.display.debug(f"Failed to remove temp file {temp_file}: {e}")
         
         return removed_count
     
@@ -325,7 +325,6 @@ class FileManager:
             except FileValidationError as e:
                 invalid_files.append(f"{filepath}: {e}")
         
-        if self.debug:
-            print(f"[DEBUG] Batch validation: {len(valid_files)} valid, {len(invalid_files)} invalid")
+        self.display.debug(f"Batch validation: {len(valid_files)} valid, {len(invalid_files)} invalid")
         
         return valid_files, invalid_files

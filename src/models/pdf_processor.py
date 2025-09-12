@@ -14,6 +14,7 @@ from .pdf_document import PDFDocument
 from .text_search_engine import TextSearchEngine
 from ..config.settings import config
 from ..utils.file_manager import FileManager, FileValidationError
+from ..ui.display_manager import DisplayManager, DisplayConfig
 
 
 class ProcessingResult:
@@ -51,16 +52,26 @@ class PDFProcessor:
     removal to provide a complete PDF trimming workflow.
     """
     
-    def __init__(self, debug: Optional[bool] = None):
+    def __init__(self, debug: Optional[bool] = None, display_manager: Optional[DisplayManager] = None):
         """
         Initialize the PDFProcessor.
         
         Args:
             debug: Enable debug logging (defaults to config.debug_mode if None)
+            display_manager: Optional DisplayManager for output formatting
         """
         self.debug = debug if debug is not None else config.debug_mode
-        self.search_engine = TextSearchEngine(debug=self.debug)
-        self.file_manager = FileManager(debug=self.debug)
+        
+        # Use provided DisplayManager or create a default one
+        if display_manager:
+            self.display = display_manager
+        else:
+            display_config = DisplayConfig(debug_enabled=self.debug)
+            self.display = DisplayManager(display_config)
+        
+        # Initialize other components with shared DisplayManager
+        self.search_engine = TextSearchEngine(debug=self.debug, display_manager=self.display)
+        self.file_manager = FileManager(debug=self.debug, display_manager=self.display)
     
     def process_pdf(self, input_file: Union[str, Path], search_string: str, 
                    output_dir: Union[str, Path]) -> ProcessingResult:
@@ -80,9 +91,8 @@ class PDFProcessor:
             validated_input = self.file_manager.validate_input_file(input_file)
             validated_output_dir = self.file_manager.ensure_output_directory(output_dir)
             
-            if self.debug:
-                print(f"[DEBUG] Processing: {validated_input}")
-                print(f"[DEBUG] Search string: '{search_string}'")
+            self.display.debug(f"Processing: {validated_input}")
+            self.display.debug(f"Search string: '{search_string}'")
             
             # Find the position of the search string
             position_result = self.search_engine.find_text_position(validated_input, search_string)
@@ -122,8 +132,7 @@ class PDFProcessor:
         Returns:
             ProcessingResult object
         """
-        if self.debug:
-            print(f"[DEBUG] Search string not found, copying entire PDF and removing blank pages")
+        self.display.debug("Search string not found, copying entire PDF and removing blank pages")
         
         with PDFDocument(input_file) as doc:
             blank_pages_removed = self._remove_blank_pages(doc)
@@ -157,8 +166,7 @@ class PDFProcessor:
         Returns:
             ProcessingResult object
         """
-        if self.debug:
-            print(f"[DEBUG] Will trim page {page_num} at Y-coordinate {y_coord}")
+        self.display.debug(f"Will trim page {page_num} at Y-coordinate {y_coord}")
         
         blank_pages_removed = self._trim_page_content(input_file, output_file, page_num, y_coord)
         
@@ -213,8 +221,8 @@ class PDFProcessor:
                 # Remove blank pages from the final document
                 blank_pages_removed = self._remove_blank_pages(new_doc)
                 
-                if self.debug and blank_pages_removed > 0:
-                    print(f"[DEBUG] Removed {blank_pages_removed} blank page(s)")
+                if blank_pages_removed > 0:
+                    self.display.debug(f"Removed {blank_pages_removed} blank page(s)")
                 
                 # Save the modified document
                 new_doc.save(output_file)
@@ -238,14 +246,12 @@ class PDFProcessor:
             page = doc[page_num]
             if page.is_blank():
                 blank_pages.append(page_num)
-                if self.debug:
-                    print(f"[DEBUG] Found blank page: {page_num}")
+                self.display.debug(f"Found blank page: {page_num}")
         
         # Remove blank pages
         for page_num in blank_pages:
             doc.delete_page(page_num)
-            if self.debug:
-                print(f"[DEBUG] Removed blank page: {page_num}")
+            self.display.debug(f"Removed blank page: {page_num}")
         
         return len(blank_pages)
     

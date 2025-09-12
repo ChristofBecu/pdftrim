@@ -10,6 +10,7 @@ from typing import Tuple, Optional, List
 from dataclasses import dataclass
 
 from ..config.settings import config
+from ..ui.display_manager import DisplayManager
 
 
 class CLIError(Exception):
@@ -55,14 +56,16 @@ class CLIHandler:
     ERROR_EMPTY_SEARCH = "Search string cannot be empty"
     ERROR_FILE_REQUIRED = "Input file path is required"
     
-    def __init__(self, debug: Optional[bool] = None):
+    def __init__(self, debug: Optional[bool] = None, display: Optional[DisplayManager] = None):
         """
         Initialize the CLIHandler.
         
         Args:
             debug: Enable debug logging (defaults to config.debug_mode if None)
+            display: DisplayManager instance for output
         """
         self.debug = debug if debug is not None else config.debug_mode
+        self.display = display or DisplayManager()
     
     def parse_arguments(self, args: Optional[List[str]] = None) -> ParsedArguments:
         """
@@ -81,7 +84,7 @@ class CLIHandler:
             args = sys.argv[1:]
         
         if self.debug:
-            print(f"[DEBUG] Parsing arguments: {args}")
+            self.display.debug(f"Parsing arguments: {args}")
         
         # Validate argument count
         if len(args) not in [1, 2]:
@@ -191,7 +194,7 @@ class CLIHandler:
         Args:
             message: Error message to display
         """
-        print(f"Error: {message}", file=sys.stderr)
+        self.display.error(message)
     
     def display_no_files_found(self, file_type: str = "PDF files") -> None:
         """
@@ -311,9 +314,9 @@ class CLIHandler:
                     if validate_func(user_input):
                         return user_input
                     else:
-                        print("Invalid input. Please try again.")
+                        self.display.warning("Invalid input. Please try again.")
                 except Exception as e:
-                    print(f"Validation error: {e}")
+                    self.display.error(f"Validation error: {e}")
             else:
                 return user_input
     

@@ -18,8 +18,12 @@ from src.models.pdf_processor import PDFProcessor
 from src.utils.file_manager import FileManager
 from src.cli.cli_handler import CLIHandler
 from src.config.settings import config
+from src.ui.display_manager import DisplayManager, DisplayConfig
 
 # Configuration is now handled by the config object
+
+# Initialize a global DisplayManager for functions that need debug output
+display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
 
 
 def trim_pdf(input_file: str, search_string: str, output_dir: str | None = None) -> bool:
@@ -36,7 +40,7 @@ def trim_pdf(input_file: str, search_string: str, output_dir: str | None = None)
     """
     # Initialize processor
     processor = PDFProcessor(debug=config.debug_mode)
-    cli_handler = CLIHandler(debug=config.debug_mode)
+    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
     
     # Process the PDF using the processor (convert None to empty string for processor)
     result = processor.process_pdf(input_file, search_string, output_dir or config.output_dir)
@@ -64,14 +68,12 @@ def remove_blank_pages(doc: PDFDocument) -> int:
         page = doc[page_num]
         if page.is_blank():
             blank_pages.append(page_num)
-            if config.debug_mode:
-                print(f"[DEBUG] Found blank page: {page_num}")
+            display.debug(f"Found blank page: {page_num}")
     
     # Remove blank pages
     for page_num in blank_pages:
         doc.delete_page(page_num)
-        if config.debug_mode:
-            print(f"[DEBUG] Removed blank page: {page_num}")
+        display.debug(f"Removed blank page: {page_num}")
     
     return len(blank_pages)
 
@@ -93,11 +95,11 @@ def debug_pdfminer_first_lines(input_file: str) -> None:
     if not config.debug_mode:
         return
         
-    print("[DEBUG] Using pdfminer.six to extract first line of each page:")
+    display.debug("Using pdfminer.six to extract first line of each page:")
     for page_num, page_layout in enumerate(extract_pages(input_file)):
         lines = extract_page_text(page_layout)
         first_line = lines[0] if lines else "[NO TEXT]"
-        print(f"[DEBUG] pdfminer page {page_num}: {first_line}")
+        display.debug(f"pdfminer page {page_num}: {first_line}")
 
 
 
@@ -123,8 +125,11 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
     # Process the PDF using the processor
     result = processor.process_pdf(input_file, search_string, output_dir)
     
-    # Print the result
-    print(result)
+    # Display the result
+    if result.success and result.output_file:
+        display.file_processing_result(str(input_file), str(result.output_file), "Success")
+    else:
+        display.error(result.message)
     
     return result.success
 
@@ -145,7 +150,7 @@ def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     pdf_files = file_manager.find_pdf_files()
     
     # Use CLIHandler for consistent display
-    cli_handler = CLIHandler(debug=config.debug_mode)
+    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
     
     if not pdf_files:
         cli_handler.display_no_files_found()
@@ -172,7 +177,7 @@ def process_single_pdf(input_pdf: str, search_string: str, output_dir: str | Non
         output_dir = config.output_dir
     
     # Use CLIHandler for consistent display
-    cli_handler = CLIHandler(debug=config.debug_mode)
+    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
     cli_handler.display_processing_start(1, search_string, output_dir)
     
     if trim_pdf(input_pdf, search_string, output_dir):
@@ -184,7 +189,7 @@ def process_single_pdf(input_pdf: str, search_string: str, output_dir: str | Non
 def main() -> None:
     """Main entry point."""
     # Initialize CLI handler
-    cli_handler = CLIHandler(debug=config.debug_mode)
+    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
     
     # Parse command line arguments
     args = cli_handler.handle_arguments()

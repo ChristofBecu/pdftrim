@@ -1,25 +1,29 @@
 """Page model for PDF processing."""
 
 import fitz
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from fitz import Page as FitzPage
+
+from ..ui.display_manager import DisplayManager
 
 
 class Page:
     """Wrapper class for PyMuPDF page objects with enhanced functionality."""
     
-    def __init__(self, fitz_page: Any, debug: bool = False):
+    def __init__(self, fitz_page: Any, debug: bool = False, display: Optional[DisplayManager] = None):
         """
         Initialize Page wrapper.
         
         Args:
             fitz_page: PyMuPDF page object
             debug: Enable debug logging
+            display: DisplayManager instance for output
         """
         self._page = fitz_page
         self.debug = debug
+        self.display = display or DisplayManager()
     
     @property
     def rect(self):
@@ -67,7 +71,7 @@ class Page:
         
         if substantial_text_blocks:
             if self.debug:
-                print(f"[DEBUG] Page has {len(substantial_text_blocks)} substantial text blocks")
+                self.display.debug(f"Page has {len(substantial_text_blocks)} substantial text blocks")
             return False
         
         # Get page dimensions for analysis
@@ -80,7 +84,7 @@ class Page:
             # Even with images/drawings, if there's absolutely no text, 
             # it's likely a blank template page
             if self.debug:
-                print(f"[DEBUG] Page has no text content - Text: '{text}', Drawings: {len(drawings)}, Images: {len(images)}")
+                self.display.debug(f"Page has no text content - Text: '{text}', Drawings: {len(drawings)}, Images: {len(images)}")
             return True
         
         # If there's minimal text (1-20 chars), check if it's just page numbers or similar
@@ -88,7 +92,7 @@ class Page:
             # Check if the text is just numbers, dates, or other minimal content
             if text.replace(' ', '').replace('\n', '').isdigit() or len(text.strip()) < 5:
                 if self.debug:
-                    print(f"[DEBUG] Page has only minimal text content: '{text}'")
+                    self.display.debug(f"Page has only minimal text content: '{text}'")
                 return True
         
         # If we get here, there's some text content, so keep the page

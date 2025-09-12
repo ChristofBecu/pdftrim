@@ -9,6 +9,7 @@ from typing import Optional, Tuple, List, Union
 from pathlib import Path
 
 from .pdf_document import PDFDocument
+from ..ui.display_manager import DisplayManager, DisplayConfig
 
 
 class TextSearchEngine:
@@ -19,14 +20,22 @@ class TextSearchEngine:
     text positions, extracting coordinates, and implementing different search strategies.
     """
     
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, display_manager: Optional[DisplayManager] = None):
         """
         Initialize the TextSearchEngine.
         
         Args:
             debug: Enable debug logging for search operations
+            display_manager: Optional DisplayManager for output formatting
         """
         self.debug = debug
+        
+        # Use provided DisplayManager or create a default one
+        if display_manager:
+            self.display = display_manager
+        else:
+            display_config = DisplayConfig(debug_enabled=self.debug)
+            self.display = DisplayManager(display_config)
     
     def find_text_position(self, pdf_path: Union[str, Path], search_string: str) -> Optional[Tuple[int, float]]:
         """
@@ -39,20 +48,17 @@ class TextSearchEngine:
         Returns:
             Tuple of (page_number, y_coordinate) if found, None otherwise
         """
-        if self.debug:
-            print(f"[DEBUG] Using PyMuPDF to find text position for: '{search_string}'")
+        self.display.debug(f"Using PyMuPDF to find text position for: '{search_string}'")
         
         with PDFDocument(pdf_path) as doc:
             result = doc.find_first_text_position(search_string)
             
             if result:
                 page_num, y_coord = result
-                if self.debug:
-                    print(f"[DEBUG] Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
+                self.display.debug(f"Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
                 return page_num, y_coord
             else:
-                if self.debug:
-                    print(f"[DEBUG] Text '{search_string}' not found in document")
+                self.display.debug(f"Text '{search_string}' not found in document")
                 return None
     
     def find_all_text_positions(self, pdf_path: Union[str, Path], search_string: str) -> List[Tuple[int, float]]:
@@ -66,19 +72,17 @@ class TextSearchEngine:
         Returns:
             List of (page_number, y_coordinate) tuples for all occurrences
         """
-        if self.debug:
-            print(f"[DEBUG] Searching for all occurrences of: '{search_string}'")
+        self.display.debug(f"Searching for all occurrences of: '{search_string}'")
         
         with PDFDocument(pdf_path) as doc:
             results = doc.search_text(search_string)
             
-            if self.debug:
-                if results:
-                    print(f"[DEBUG] Found {len(results)} occurrence(s) of '{search_string}'")
-                    for page_num, y_coord in results:
-                        print(f"[DEBUG]   Page {page_num}: Y-coordinate {y_coord}")
-                else:
-                    print(f"[DEBUG] Text '{search_string}' not found in document")
+            if results:
+                self.display.debug(f"Found {len(results)} occurrence(s) of '{search_string}'")
+                for page_num, y_coord in results:
+                    self.display.debug(f"  Page {page_num}: Y-coordinate {y_coord}")
+            else:
+                self.display.debug(f"Text '{search_string}' not found in document")
             
             return results
     
@@ -94,13 +98,11 @@ class TextSearchEngine:
         Returns:
             List of y-coordinates where text was found on the specified page
         """
-        if self.debug:
-            print(f"[DEBUG] Searching for '{search_string}' on page {page_num}")
+        self.display.debug(f"Searching for '{search_string}' on page {page_num}")
         
         with PDFDocument(pdf_path) as doc:
             if page_num >= len(doc):
-                if self.debug:
-                    print(f"[DEBUG] Page {page_num} out of range (document has {len(doc)} pages)")
+                self.display.debug(f"Page {page_num} out of range (document has {len(doc)} pages)")
                 return []
             
             page = doc[page_num]
@@ -108,13 +110,12 @@ class TextSearchEngine:
             
             y_coordinates = [rect.y0 for rect in text_instances]
             
-            if self.debug:
-                if y_coordinates:
-                    print(f"[DEBUG] Found {len(y_coordinates)} occurrence(s) on page {page_num}")
-                    for y_coord in y_coordinates:
-                        print(f"[DEBUG]   Y-coordinate: {y_coord}")
-                else:
-                    print(f"[DEBUG] Text '{search_string}' not found on page {page_num}")
+            if y_coordinates:
+                self.display.debug(f"Found {len(y_coordinates)} occurrence(s) on page {page_num}")
+                for y_coord in y_coordinates:
+                    self.display.debug(f"  Y-coordinate: {y_coord}")
+            else:
+                self.display.debug(f"Text '{search_string}' not found on page {page_num}")
             
             return y_coordinates
     
@@ -147,8 +148,7 @@ class TextSearchEngine:
             # Lowest Y-coordinate
             return min(all_results, key=lambda x: x[1])
         else:
-            if self.debug:
-                print(f"[DEBUG] Unknown strategy '{strategy}', using 'first'")
+            self.display.debug(f"Unknown strategy '{strategy}', using 'first'")
             return all_results[0]
     
     def is_text_present(self, pdf_path: Union[str, Path], search_string: str) -> bool:

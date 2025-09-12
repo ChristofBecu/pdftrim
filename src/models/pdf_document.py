@@ -107,8 +107,8 @@ class PDFDocument:
         
         fitz_page = self._doc[page_num]
         # Import config here to avoid circular imports
-        from ..config.settings import config
-        return Page(fitz_page, debug=config.debug_mode)
+        from ..config.settings import config, display
+        return Page(fitz_page, debug=config.debug_mode, display=display)
     
     def get_page(self, page_num: int) -> Page:
         """
@@ -221,8 +221,8 @@ class PDFDocument:
             return []
         
         # Import config here to avoid circular imports
-        from ..config.settings import config
-        return [Page(self._doc[i], debug=config.debug_mode) for i in range(len(self._doc))]
+        from ..config.settings import config, display
+        return [Page(self._doc[i], debug=config.debug_mode, display=display) for i in range(len(self._doc))]
     
     @property
     def is_open(self) -> bool:

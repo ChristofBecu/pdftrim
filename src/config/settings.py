@@ -92,11 +92,6 @@ class Config:
         base, ext = os.path.splitext(filename)
         return os.path.join(output_directory, f"{base}{self.output_suffix}{ext}")
     
-    def debug_print(self, message: str) -> None:
-        """Print debug message if debug mode is enabled."""
-        if self.debug_mode:
-            print(f"[DEBUG] {message}")
-    
     def __repr__(self) -> str:
         """String representation of configuration."""
         return (f"Config(debug={self.debug_mode}, "
@@ -106,3 +101,7 @@ class Config:
 
 # Global config instance
 config = Config()
+
+# Global display manager instance
+from ..ui.display_manager import DisplayManager
+display = DisplayManager()
