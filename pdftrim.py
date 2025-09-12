@@ -12,6 +12,9 @@ from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTTextBox, LTTextLine, LTChar
 import fitz  # PyMuPDF for more advanced PDF manipulation
 
+# Import our custom classes
+from src.models.page import Page
+
 # Configuration
 DEBUG = False
 
@@ -26,51 +29,9 @@ def is_page_blank(page) -> bool:
     Returns:
         True if the page is blank, False otherwise
     """
-    # Get all text from the page
-    text = page.get_text().strip()
-    meaningful_text = text.replace(' ', '').replace('\n', '').replace('\t', '')
-    
-    # If there's substantial meaningful text content, it's definitely not blank
-    if len(meaningful_text) > 20:
-        return False
-    
-    # Check for text blocks - more reliable than raw text
-    text_blocks = page.get_text('blocks')
-    substantial_text_blocks = [block for block in text_blocks if len(block[4].strip()) > 10]
-    
-    if substantial_text_blocks:
-        if DEBUG:
-            print(f"[DEBUG] Page has {len(substantial_text_blocks)} substantial text blocks")
-        return False
-    
-    # If we get here, there's no substantial text content
-    # The page might have decorative elements but no meaningful content
-    
-    # Get page dimensions for analysis
-    rect = page.rect
-    page_area = rect.width * rect.height
-    
-    drawings = page.get_drawings()
-    images = page.get_images()
-    
-    # Special case: if there's no text AND it's likely a template/decorative page
-    if len(meaningful_text) == 0:
-        # Even with images/drawings, if there's absolutely no text, 
-        # it's likely a blank template page
-        if DEBUG:
-            print(f"[DEBUG] Page has no text content - Text: '{text}', Drawings: {len(drawings)}, Images: {len(images)}")
-        return True
-    
-    # If there's minimal text (1-20 chars), check if it's just page numbers or similar
-    if len(meaningful_text) <= 20:
-        # Check if the text is just numbers, dates, or other minimal content
-        if text.replace(' ', '').replace('\n', '').isdigit() or len(text.strip()) < 5:
-            if DEBUG:
-                print(f"[DEBUG] Page has only minimal text content: '{text}'")
-            return True
-    
-    # If we get here, there's some text content, so keep the page
-    return False
+    # Create a Page wrapper and use its is_blank method
+    page_wrapper = Page(page, debug=DEBUG)
+    return page_wrapper.is_blank()
 
 
 def remove_blank_pages(doc) -> int:
