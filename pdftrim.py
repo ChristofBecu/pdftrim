@@ -3,8 +3,6 @@
 PDF Trimmer - Removes pages from a PDF starting at a specific search string.
 """
 
-import sys
-import os
 import glob
 from pathlib import Path
 from PyPDF2 import PdfReader, PdfWriter
@@ -18,9 +16,35 @@ from src.models.pdf_document import PDFDocument
 from src.models.text_search_engine import TextSearchEngine
 from src.models.pdf_processor import PDFProcessor
 from src.utils.file_manager import FileManager
+from src.cli.cli_handler import CLIHandler
 from src.config.settings import config
 
 # Configuration is now handled by the config object
+
+
+def trim_pdf(input_file: str, search_string: str, output_dir: str | None = None) -> bool:
+    """
+    Trim a PDF file by removing pages after the search string.
+    
+    Args:
+        input_file: Path to the input PDF file
+        search_string: Text to search for as the cutoff point
+        output_dir: Directory to save the output file (optional)
+        
+    Returns:
+        True if processing was successful, False otherwise
+    """
+    # Initialize processor
+    processor = PDFProcessor(debug=config.debug_mode)
+    cli_handler = CLIHandler(debug=config.debug_mode)
+    
+    # Process the PDF using the processor (convert None to empty string for processor)
+    result = processor.process_pdf(input_file, search_string, output_dir or config.output_dir)
+    
+    # Display the result using CLI handler
+    cli_handler.display_result(result)
+    
+    return result.success
 
 
 def remove_blank_pages(doc: PDFDocument) -> int:
@@ -111,42 +135,6 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
 
 
 
-def trim_pdf(input_file: str, search_string: str, output_dir: str) -> bool:
-    """
-    Trim PDF by removing content starting from where search_string is found.
-    This version can trim content from the middle of a page.
-    
-    Args:
-        input_file: Path to input PDF file
-        search_string: String to search for as cutoff point
-        output_dir: Directory to save the output file
-        
-    Returns:
-        True if successful, False otherwise
-    """
-    return trim_pdf_advanced(input_file, search_string, output_dir)
-
-
-def parse_arguments() -> tuple[str, str]:
-    """Parse and validate command line arguments."""
-    if len(sys.argv) not in [2, 3]:
-        print("Usage:")
-        print("  python pdftrim.py 'search_string'                    # Process all PDFs in current directory")
-        print("  python pdftrim.py input.pdf 'search_string'          # Process single PDF")
-        print("  Output files will be saved in 'output' directory")
-        sys.exit(1)
-    
-    if len(sys.argv) == 2:
-        # Process all PDFs in current directory
-        return ".", sys.argv[1]
-    else:
-        # Process single PDF
-        input_pdf = sys.argv[1]
-        search_str = sys.argv[2]
-        
-        return input_pdf, search_str
-
-
 def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     """Process all PDF files in the current directory."""
     if output_dir is None:
@@ -156,17 +144,15 @@ def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     file_manager = FileManager(debug=config.debug_mode)
     pdf_files = file_manager.find_pdf_files()
     
+    # Use CLIHandler for consistent display
+    cli_handler = CLIHandler(debug=config.debug_mode)
+    
     if not pdf_files:
-        print("No PDF files found in current directory.")
+        cli_handler.display_no_files_found()
         return
     
-    print(f"Found {len(pdf_files)} PDF file(s) to process:")
-    for pdf_file in pdf_files:
-        print(f"  - {os.path.basename(pdf_file)}")
-    
-    print(f"\nProcessing files with search string: '{search_string}'")
-    print(f"Output directory: {output_dir}")
-    print("-" * 50)
+    cli_handler.display_file_list(pdf_files, f"Found {len(pdf_files)} PDF file(s) to process:")
+    cli_handler.display_processing_start(len(pdf_files), search_string, output_dir)
     
     successful = 0
     failed = 0
@@ -177,38 +163,38 @@ def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
         else:
             failed += 1
     
-    print("-" * 50)
-    print(f"Processing complete: {successful} successful, {failed} failed")
+    cli_handler.display_processing_complete(successful, failed)
 
 
 def process_single_pdf(input_pdf: str, search_string: str, output_dir: str | None = None) -> None:
     """Process a single PDF file."""
     if output_dir is None:
         output_dir = config.output_dir
-        
-    print(f"Processing: {os.path.basename(input_pdf)}")
-    print(f"Search string: '{search_string}'")
-    print(f"Output directory: {output_dir}")
-    print("-" * 50)
+    
+    # Use CLIHandler for consistent display
+    cli_handler = CLIHandler(debug=config.debug_mode)
+    cli_handler.display_processing_start(1, search_string, output_dir)
     
     if trim_pdf(input_pdf, search_string, output_dir):
-        print("-" * 50)
-        print("Processing complete: 1 successful, 0 failed")
+        cli_handler.display_processing_complete(1, 0)
     else:
-        print("-" * 50)
-        print("Processing complete: 0 successful, 1 failed")
+        cli_handler.display_processing_complete(0, 1)
 
 
 def main() -> None:
     """Main entry point."""
-    input_arg, search_str = parse_arguments()
+    # Initialize CLI handler
+    cli_handler = CLIHandler(debug=config.debug_mode)
     
-    if input_arg == ".":
+    # Parse command line arguments
+    args = cli_handler.handle_arguments()
+    
+    if args.is_batch_mode:
         # Process all PDFs in current directory
-        process_all_pdfs(search_str)
+        process_all_pdfs(args.search_string)
     else:
         # Process single PDF
-        process_single_pdf(input_arg, search_str)
+        process_single_pdf(args.input_path, args.search_string)
 
 
 
