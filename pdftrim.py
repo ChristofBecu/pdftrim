@@ -105,7 +105,8 @@ def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, 
             
             # Copy all pages before the cutoff page
             for i in range(page_num):
-                new_doc.insert_pdf(source_doc, from_page=i, to_page=i)
+                # Insert each page at the end to maintain order
+                new_doc.insert_pdf(source_doc, start_at=len(new_doc), from_page=i, to_page=i)
             
             # Process the cutoff page - remove content below y_cutoff
             if page_num < len(source_doc):
