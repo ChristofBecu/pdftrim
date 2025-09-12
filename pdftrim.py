@@ -14,9 +14,9 @@ import fitz  # PyMuPDF for more advanced PDF manipulation
 
 # Import our custom classes
 from src.models.page import Page
+from src.config.settings import config
 
-# Configuration
-DEBUG = False
+# Configuration is now handled by the config object
 
 
 def is_page_blank(page) -> bool:
@@ -30,7 +30,7 @@ def is_page_blank(page) -> bool:
         True if the page is blank, False otherwise
     """
     # Create a Page wrapper and use its is_blank method
-    page_wrapper = Page(page, debug=DEBUG)
+    page_wrapper = Page(page, debug=config.debug_mode)
     return page_wrapper.is_blank()
 
 
@@ -51,13 +51,13 @@ def remove_blank_pages(doc) -> int:
         page = doc[page_num]
         if is_page_blank(page):
             blank_pages.append(page_num)
-            if DEBUG:
+            if config.debug_mode:
                 print(f"[DEBUG] Found blank page: {page_num}")
     
     # Remove blank pages
     for page_num in blank_pages:
         doc.delete_page(page_num)
-        if DEBUG:
+        if config.debug_mode:
             print(f"[DEBUG] Removed blank page: {page_num}")
     
     return len(blank_pages)
@@ -77,7 +77,7 @@ def extract_page_text(page_layout) -> list[str]:
 
 def debug_pdfminer_first_lines(input_file: str) -> None:
     """Debug function to print the first line of each page."""
-    if not DEBUG:
+    if not config.debug_mode:
         return
         
     print("[DEBUG] Using pdfminer.six to extract first line of each page:")
@@ -92,7 +92,7 @@ def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int
     Find the page number and Y-coordinate where the search string appears.
     Returns (page_num, y_coordinate) or None if not found.
     """
-    if DEBUG:
+    if config.debug_mode:
         print(f"[DEBUG] Using PyMuPDF to find text position for: '{search_string}'")
     
     doc = fitz.open(input_file)
@@ -108,14 +108,14 @@ def find_text_position_pymupdf(input_file: str, search_string: str) -> tuple[int
             rect = text_instances[0]
             y_coord = rect.y0  # Top Y coordinate of the text
             
-            if DEBUG:
+            if config.debug_mode:
                 print(f"[DEBUG] Found '{search_string}' on page {page_num} at Y-coordinate {y_coord}")
             
             doc.close()
             return page_num, y_coord
     
     doc.close()
-    if DEBUG:
+    if config.debug_mode:
         print(f"[DEBUG] Text '{search_string}' not found in document")
     return None
 
@@ -152,7 +152,7 @@ def trim_page_content_pymupdf(input_file: str, output_file: str, page_num: int, 
     # Remove blank pages from the final document
     blank_pages_removed = remove_blank_pages(new_doc)
     
-    if DEBUG and blank_pages_removed > 0:
+    if config.debug_mode and blank_pages_removed > 0:
         print(f"[DEBUG] Removed {blank_pages_removed} blank page(s)")
     
     # Save the modified document
@@ -174,7 +174,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
         True if successful, False otherwise
     """
     try:
-        if DEBUG:
+        if config.debug_mode:
             print(f"[DEBUG] Processing: {input_file}")
             print(f"[DEBUG] Search string: '{search_string}'")
         
@@ -183,7 +183,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
         
         if position_result is None:
             # If search string not found, copy the entire PDF but still remove blank pages
-            if DEBUG:
+            if config.debug_mode:
                 print(f"[DEBUG] Search string not found, copying entire PDF and removing blank pages")
             
             # Use PyMuPDF to handle blank page removal
@@ -202,7 +202,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
         
         page_num, y_coord = position_result
         
-        if DEBUG:
+        if config.debug_mode:
             print(f"[DEBUG] Will trim page {page_num} at Y-coordinate {y_coord}")
         
         # Create output filename and trim the PDF
@@ -219,9 +219,7 @@ def trim_pdf_advanced(input_file: str, search_string: str, output_dir: str) -> b
 
 def create_output_filename(input_file: str, output_dir: str) -> str:
     """Generate output filename in the specified output directory."""
-    filename = os.path.basename(input_file)
-    base, ext = os.path.splitext(filename)
-    return os.path.join(output_dir, f"{base}_edit{ext}")
+    return config.create_output_filename(input_file, output_dir)
 
 
 def ensure_output_directory(output_dir: str) -> None:
@@ -233,9 +231,9 @@ def ensure_output_directory(output_dir: str) -> None:
 
 def find_pdf_files(directory: str = ".") -> list[str]:
     """Find all PDF files in the given directory."""
-    pdf_pattern = os.path.join(directory, "*.pdf")
+    pdf_pattern = os.path.join(directory, config.pdf_pattern)
     pdf_files = glob.glob(pdf_pattern)
-    return [f for f in pdf_files if not f.endswith("_edit.pdf")]  # Skip already processed files
+    return [f for f in pdf_files if not f.endswith(config.processed_suffix)]  # Skip already processed files
 
 
 def trim_pdf(input_file: str, search_string: str, output_dir: str) -> bool:
@@ -279,8 +277,11 @@ def parse_arguments() -> tuple[str, str]:
         return input_pdf, search_str
 
 
-def process_all_pdfs(search_string: str, output_dir: str = "output") -> None:
+def process_all_pdfs(search_string: str, output_dir: str | None = None) -> None:
     """Process all PDF files in the current directory."""
+    if output_dir is None:
+        output_dir = config.output_dir
+        
     pdf_files = find_pdf_files()
     
     if not pdf_files:
@@ -310,8 +311,11 @@ def process_all_pdfs(search_string: str, output_dir: str = "output") -> None:
     print(f"Processing complete: {successful} successful, {failed} failed")
 
 
-def process_single_pdf(input_pdf: str, search_string: str, output_dir: str = "output") -> None:
+def process_single_pdf(input_pdf: str, search_string: str, output_dir: str | None = None) -> None:
     """Process a single PDF file."""
+    if output_dir is None:
+        output_dir = config.output_dir
+        
     ensure_output_directory(output_dir)
     
     print(f"Processing: {os.path.basename(input_pdf)}")
