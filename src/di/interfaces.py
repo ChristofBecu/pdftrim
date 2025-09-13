@@ -169,3 +169,20 @@ class IConfig(ABC):
     def pdf_pattern(self) -> str:
         """Get PDF file search pattern."""
         pass
+
+
+class IApplicationController(ABC):
+    """Interface for the main application controller."""
+    
+    @abstractmethod
+    def run(self, args: Optional[List[str]] = None) -> int:
+        """
+        Run the complete application workflow.
+        
+        Args:
+            args: Command line arguments (uses sys.argv if None)
+            
+        Returns:
+            Exit code (0 for success, non-zero for failure)
+        """
+        pass

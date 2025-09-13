@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from .interfaces import (
     IDisplayManager, IFileManager, ITextSearchEngine, 
-    IPDFProcessor, ICLIHandler, IConfig
+    IPDFProcessor, ICLIHandler, IConfig, IApplicationController
 )
 from ..config.settings import Config
 from ..ui.display_manager import DisplayManager, DisplayConfig
@@ -18,6 +18,7 @@ from ..utils.file_manager import FileManager
 from ..models.text_search_engine import TextSearchEngine
 from ..models.pdf_processor import PDFProcessor
 from ..cli.cli_handler import CLIHandler
+from ..controllers.application_controller import ApplicationController
 
 
 T = TypeVar('T')
@@ -170,6 +171,31 @@ class DependencyContainer:
             return CLIHandler(debug=config.debug_mode, display=display_manager)
         
         self.register_singleton(ICLIHandler, create_cli_handler)
+        
+        # Register ApplicationController as singleton
+        def create_application_controller() -> ApplicationController:
+            cli_handler = self.resolve(ICLIHandler)
+            display = self.resolve(IDisplayManager)
+            file_manager = self.resolve(IFileManager)
+            processor = self.resolve(IPDFProcessor)
+            config = self.resolve(IConfig)
+            
+            # Cast to concrete types for constructor
+            cli_handler_concrete = cast(CLIHandler, cli_handler)
+            display_concrete = cast(DisplayManager, display)
+            file_manager_concrete = cast(FileManager, file_manager)
+            processor_concrete = cast(PDFProcessor, processor)
+            config_concrete = cast(Config, config)
+            
+            return ApplicationController(
+                cli_handler=cli_handler_concrete,
+                display=display_concrete,
+                file_manager=file_manager_concrete,
+                processor=processor_concrete,
+                config=config_concrete
+            )
+        
+        self.register_singleton(IApplicationController, create_application_controller)
     
     def create_config_with_debug(self, debug_mode: bool) -> 'DependencyContainer':
         """
@@ -236,6 +262,31 @@ class DependencyContainer:
             return CLIHandler(debug=config.debug_mode, display=display_manager)
         
         self.register_singleton(ICLIHandler, create_cli_handler)
+        
+        # Register ApplicationController as singleton
+        def create_application_controller() -> ApplicationController:
+            cli_handler = self.resolve(ICLIHandler)
+            display = self.resolve(IDisplayManager)
+            file_manager = self.resolve(IFileManager)
+            processor = self.resolve(IPDFProcessor)
+            config = self.resolve(IConfig)
+            
+            # Cast to concrete types for constructor
+            cli_handler_concrete = cast(CLIHandler, cli_handler)
+            display_concrete = cast(DisplayManager, display)
+            file_manager_concrete = cast(FileManager, file_manager)
+            processor_concrete = cast(PDFProcessor, processor)
+            config_concrete = cast(Config, config)
+            
+            return ApplicationController(
+                cli_handler=cli_handler_concrete,
+                display=display_concrete,
+                file_manager=file_manager_concrete,
+                processor=processor_concrete,
+                config=config_concrete
+            )
+        
+        self.register_singleton(IApplicationController, create_application_controller)
     
     def is_registered(self, interface: Type) -> bool:
         """

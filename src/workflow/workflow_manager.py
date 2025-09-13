@@ -9,7 +9,7 @@ with consistent error handling, progress reporting, and output management.
 from typing import Optional, List, Tuple
 from pathlib import Path
 
-from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, ICLIHandler, IConfig
+from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, IConfig
 
 
 class WorkflowManager:
@@ -18,14 +18,14 @@ class WorkflowManager:
     
     This class eliminates duplication between single file and batch processing
     by providing consistent workflow orchestration, output directory handling,
-    and progress reporting. Uses dependency injection for better testability.
+    and progress reporting. Focuses purely on workflow coordination without
+    CLI-specific concerns.
     """
     
     def __init__(self, 
                  display: IDisplayManager,
                  processor: IPDFProcessor,
                  file_manager: IFileManager,
-                 cli_handler: ICLIHandler,
                  config: IConfig,
                  debug: Optional[bool] = None):
         """
@@ -35,49 +35,48 @@ class WorkflowManager:
             display: DisplayManager instance for output
             processor: PDFProcessor for handling PDF operations
             file_manager: FileManager for file operations
-            cli_handler: CLIHandler for CLI interactions
             config: Configuration instance
             debug: Enable debug mode (uses config default if None)
         """
         self.display = display
         self.processor = processor
         self.file_manager = file_manager
-        self.cli_handler = cli_handler
         self.config = config
         self.debug = debug if debug is not None else config.debug_mode
     
-    def process_single_file(self, input_file: str, search_string: str, 
-                           output_dir: Optional[str] = None) -> bool:
+    def process_single_file(self, input_file: str, search_string: str, output_dir: str = "") -> bool:
         """
         Process a single PDF file.
         
         Args:
-            input_file: Path to the input PDF file
-            search_string: Text to search for as the cutoff point
-            output_dir: Directory to save the output file (uses config default if None)
+            input_file: Path to the PDF file to process
+            search_string: String to search for in the PDF
+            output_dir: Output directory for processed file
             
         Returns:
-            True if processing was successful, False otherwise
+            bool: True if processing was successful, False otherwise
         """
-        # Handle output directory defaulting
-        resolved_output_dir = output_dir or self.config.output_dir
+        resolved_output_dir = self.file_manager.ensure_output_directory(output_dir or self.config.output_dir)
         
-        # Display processing start
-        self.cli_handler.display_processing_start(1, search_string, resolved_output_dir)
+        # Show processing start
+        self.display.info(f"Processing file: {input_file}")
+        self.display.info(f"Search string: '{search_string}'")
+        self.display.info(f"Output directory: {resolved_output_dir}")
         
-        # Process the PDF
+        # Process the file
         result = self.processor.process_pdf(input_file, search_string, resolved_output_dir)
         
-        # Display result using CLI handler
-        self.cli_handler.display_result(result)
-        
-        # Display completion status
+        # Show result
+        self.display.info(f"Result: {result.message}")
         if result.success:
-            self.cli_handler.display_processing_complete(1, 0)
-        else:
-            self.cli_handler.display_processing_complete(0, 1)
+            self.display.info(f"Output: {result.output_file}")
         
-        return result.success
+        if result.success:
+            self.display.success("Processing complete: 1 successful, 0 failed")
+            return True
+        else:
+            self.display.error("Processing complete: 0 successful, 1 failed")
+            return False
     
     def process_batch(self, search_string: str, output_dir: Optional[str] = None) -> Tuple[int, int]:
         """
@@ -92,21 +91,26 @@ class WorkflowManager:
         """
         # Handle output directory defaulting
         resolved_output_dir = output_dir or self.config.output_dir
+        resolved_output_dir = self.file_manager.ensure_output_directory(resolved_output_dir)
         
         # Find PDF files using FileManager
         pdf_files = self.file_manager.find_pdf_files()
         
         # Check if any files were found
         if not pdf_files:
-            self.cli_handler.display_no_files_found()
+            self.display.info("No PDF files found in current directory.")
             return 0, 0
         
         # Display file list and processing start
-        self.cli_handler.display_file_list(
-            pdf_files, 
-            f"Found {len(pdf_files)} PDF file(s) to process:"
-        )
-        self.cli_handler.display_processing_start(len(pdf_files), search_string, resolved_output_dir)
+        self.display.info(f"Found {len(pdf_files)} PDF file(s) to process:")
+        for pdf_file in pdf_files:
+            import os
+            self.display.info(f"  - {os.path.basename(pdf_file)}")
+        
+        self.display.info(f"Processing {len(pdf_files)} PDF files")
+        self.display.info(f"Search string: '{search_string}'")
+        self.display.info(f"Output directory: {resolved_output_dir}")
+        self.display.info("-" * 50)
         
         # Process each file
         successful = 0
@@ -123,7 +127,14 @@ class WorkflowManager:
                 self.display.error(f"Failed to process {pdf_file}: {result.message}")
         
         # Display completion status
-        self.cli_handler.display_processing_complete(successful, failed)
+        self.display.info("-" * 50)
+        message = f"Processing complete: {successful} successful, {failed} failed"
+        if failed == 0:
+            self.display.success(message)
+        elif successful == 0:
+            self.display.error(message)
+        else:
+            self.display.warning(message)
         
         return successful, failed
     
@@ -150,7 +161,7 @@ class WorkflowManager:
             return failed == 0
         else:
             # Single file processing mode
-            return self.process_single_file(input_path, search_string, output_dir)
+            return self.process_single_file(input_path, search_string, output_dir or "")
     
     def get_processor_stats(self) -> dict:
         """
