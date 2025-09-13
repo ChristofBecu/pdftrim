@@ -71,16 +71,6 @@ class ITextSearchEngine(ABC):
     def find_text_position(self, pdf_path: Union[str, Path], search_string: str) -> Optional[Tuple[int, float]]:
         """Find the first occurrence of text in a PDF document."""
         pass
-    
-    @abstractmethod
-    def find_all_text_positions(self, pdf_path: Union[str, Path], search_string: str) -> List[Tuple[int, float]]:
-        """Find all occurrences of text in a PDF document."""
-        pass
-    
-    @abstractmethod
-    def is_text_present(self, pdf_path: Union[str, Path], search_string: str) -> bool:
-        """Check if text is present anywhere in the document."""
-        pass
 
 
 class IPDFProcessor(ABC):
