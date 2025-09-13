@@ -7,6 +7,8 @@ across PDF documents, including different search strategies and coordinate extra
 
 from typing import Optional, Tuple, List, Union
 from pathlib import Path
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTTextContainer
 
 from .pdf_document import PDFDocument
 from ..ui.display_manager import DisplayManager, DisplayConfig
@@ -204,3 +206,39 @@ class TextSearchEngine:
                 return '\n'.join(context_lines_list)
         
         return None
+
+    @staticmethod
+    def extract_page_text(page_layout) -> List[str]:
+        """
+        Extract text lines from a PDF page layout using pdfminer.
+        
+        Args:
+            page_layout: pdfminer page layout object
+            
+        Returns:
+            List of text lines found on the page
+        """
+        lines = []
+        for element in page_layout:
+            if isinstance(element, LTTextContainer):
+                for text_line in element:
+                    line_text = text_line.get_text().strip()
+                    if line_text:
+                        lines.append(line_text)
+        return lines
+
+    def debug_pdfminer_first_lines(self, input_file: str) -> None:
+        """
+        Debug function to print the first line of each page using pdfminer.
+        
+        Args:
+            input_file: Path to the PDF file to analyze
+        """
+        if not self.debug:
+            return
+            
+        self.display.debug("Using pdfminer.six to extract first line of each page:")
+        for page_num, page_layout in enumerate(extract_pages(input_file)):
+            lines = self.extract_page_text(page_layout)
+            first_line = lines[0] if lines else "[NO TEXT]"
+            self.display.debug(f"pdfminer page {page_num}: {first_line}")
