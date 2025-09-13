@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from ..config.settings import config
 from ..ui.display_manager import DisplayManager
+from ..di.interfaces import ICLIHandler
 
 
 class CLIError(Exception):
@@ -32,7 +33,7 @@ class ParsedArguments:
             raise CLIError("Search string cannot be empty")
 
 
-class CLIHandler:
+class CLIHandler(ICLIHandler):
     """
     A class for handling command line interface operations.
     

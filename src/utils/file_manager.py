@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..config.settings import config
 from ..ui.display_manager import DisplayManager, DisplayConfig
+from ..di.interfaces import IFileManager
 
 
 class FileValidationError(Exception):
@@ -20,7 +21,7 @@ class FileValidationError(Exception):
     pass
 
 
-class FileManager:
+class FileManager(IFileManager):
     """
     A class for managing all file operations in the PDF trimmer.
     

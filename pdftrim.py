@@ -3,34 +3,50 @@
 PDF Trimmer - Removes pages from a PDF starting at a specific search string.
 """
 
-# Import our custom classes
-from src.cli.cli_handler import CLIHandler
-from src.config.settings import config
-from src.workflow.workflow_manager import WorkflowManager
-from src.ui.display_manager import DisplayManager, DisplayConfig
+from typing import cast
 
-# Initialize a global DisplayManager for functions that need debug output
-display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
+from src.di.container import create_container_with_debug, get_container
+from src.di.interfaces import ICLIHandler, IDisplayManager, IFileManager, IPDFProcessor, IConfig
+from src.workflow.workflow_manager import WorkflowManager
+from src.config.settings import config
+from src.cli.cli_handler import ParsedArguments
 
 
 def main() -> None:
-    """Main entry point."""
-    # Initialize CLI handler
-    cli_handler = CLIHandler(debug=config.debug_mode, display=display)
+    """Main entry point using dependency injection."""
+    
+    # Create dependency container with debug mode from config
+    container = create_container_with_debug(config.debug_mode)
+    
+    # Resolve dependencies
+    cli_handler = container.resolve(ICLIHandler)
+    display = container.resolve(IDisplayManager)
+    file_manager = container.resolve(IFileManager)
+    processor = container.resolve(IPDFProcessor)
+    config_service = container.resolve(IConfig)
     
     # Parse command line arguments
-    args = cli_handler.handle_arguments()
+    parsed_args = cli_handler.handle_arguments()
+    # Cast to concrete type for attribute access
+    args = cast(ParsedArguments, parsed_args)
     
-    # Use WorkflowManager for processing
-    workflow = WorkflowManager(display=display, debug=config.debug_mode)
+    # Create WorkflowManager with injected dependencies
+    workflow = WorkflowManager(
+        display=display,
+        processor=processor,
+        file_manager=file_manager,
+        cli_handler=cli_handler,
+        config=config_service,
+        debug=config_service.debug_mode
+    )
+    
+    # Process workflow
     workflow.process_workflow(
         input_path=args.input_path if not args.is_batch_mode else None,
         search_string=args.search_string,
         output_dir=args.output_dir,
         is_batch_mode=args.is_batch_mode
     )
-
-
 
 
 if __name__ == "__main__":

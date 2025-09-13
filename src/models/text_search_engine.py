@@ -12,9 +12,10 @@ from pdfminer.layout import LTTextContainer
 
 from .pdf_document import PDFDocument
 from ..ui.display_manager import DisplayManager, DisplayConfig
+from ..di.interfaces import ITextSearchEngine
 
 
-class TextSearchEngine:
+class TextSearchEngine(ITextSearchEngine):
     """
     A class for handling text search operations in PDF documents.
     

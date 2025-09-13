@@ -15,6 +15,7 @@ from .text_search_engine import TextSearchEngine
 from ..config.settings import config
 from ..utils.file_manager import FileManager, FileValidationError
 from ..ui.display_manager import DisplayManager, DisplayConfig
+from ..di.interfaces import IPDFProcessor
 
 
 class ProcessingResult:
@@ -44,7 +45,7 @@ class ProcessingResult:
             return f"✗ Error processing {os.path.basename(self.input_file)}: {self.message}"
 
 
-class PDFProcessor:
+class PDFProcessor(IPDFProcessor):
     """
     A class for orchestrating PDF trimming operations.
     

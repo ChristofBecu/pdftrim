@@ -9,11 +9,7 @@ with consistent error handling, progress reporting, and output management.
 from typing import Optional, List, Tuple
 from pathlib import Path
 
-from ..config.settings import config
-from ..models.pdf_processor import PDFProcessor
-from ..utils.file_manager import FileManager
-from ..cli.cli_handler import CLIHandler
-from ..ui.display_manager import DisplayManager
+from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, ICLIHandler, IConfig
 
 
 class WorkflowManager:
@@ -22,24 +18,33 @@ class WorkflowManager:
     
     This class eliminates duplication between single file and batch processing
     by providing consistent workflow orchestration, output directory handling,
-    and progress reporting.
+    and progress reporting. Uses dependency injection for better testability.
     """
     
-    def __init__(self, display: Optional[DisplayManager] = None, debug: Optional[bool] = None):
+    def __init__(self, 
+                 display: IDisplayManager,
+                 processor: IPDFProcessor,
+                 file_manager: IFileManager,
+                 cli_handler: ICLIHandler,
+                 config: IConfig,
+                 debug: Optional[bool] = None):
         """
-        Initialize the WorkflowManager.
+        Initialize the WorkflowManager with injected dependencies.
         
         Args:
-            display: DisplayManager instance for output (uses default if None)
+            display: DisplayManager instance for output
+            processor: PDFProcessor for handling PDF operations
+            file_manager: FileManager for file operations
+            cli_handler: CLIHandler for CLI interactions
+            config: Configuration instance
             debug: Enable debug mode (uses config default if None)
         """
+        self.display = display
+        self.processor = processor
+        self.file_manager = file_manager
+        self.cli_handler = cli_handler
+        self.config = config
         self.debug = debug if debug is not None else config.debug_mode
-        self.display = display or DisplayManager()
-        
-        # Initialize core components
-        self.processor = PDFProcessor(debug=self.debug, display_manager=self.display)
-        self.file_manager = FileManager(debug=self.debug, display_manager=self.display)
-        self.cli_handler = CLIHandler(debug=self.debug, display=self.display)
     
     def process_single_file(self, input_file: str, search_string: str, 
                            output_dir: Optional[str] = None) -> bool:
@@ -55,7 +60,7 @@ class WorkflowManager:
             True if processing was successful, False otherwise
         """
         # Handle output directory defaulting
-        resolved_output_dir = output_dir or config.output_dir
+        resolved_output_dir = output_dir or self.config.output_dir
         
         # Display processing start
         self.cli_handler.display_processing_start(1, search_string, resolved_output_dir)
@@ -86,7 +91,7 @@ class WorkflowManager:
             Tuple of (successful_count, failed_count)
         """
         # Handle output directory defaulting
-        resolved_output_dir = output_dir or config.output_dir
+        resolved_output_dir = output_dir or self.config.output_dir
         
         # Find PDF files using FileManager
         pdf_files = self.file_manager.find_pdf_files()

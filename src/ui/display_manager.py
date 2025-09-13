@@ -10,6 +10,8 @@ from enum import Enum
 from typing import List, Optional, Any
 from dataclasses import dataclass
 
+from ..di.interfaces import IDisplayManager
+
 
 class MessageType(Enum):
     """Types of messages that can be displayed."""
@@ -31,7 +33,7 @@ class DisplayConfig:
     indent_size: int = 2
 
 
-class DisplayManager:
+class DisplayManager(IDisplayManager):
     """
     Centralized display and output formatting manager.
     

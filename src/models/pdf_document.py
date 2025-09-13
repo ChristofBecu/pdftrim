@@ -107,7 +107,9 @@ class PDFDocument:
         
         fitz_page = self._doc[page_num]
         # Import config here to avoid circular imports
-        from ..config.settings import config, display
+        from ..config.settings import config
+        from ..ui.display_manager import DisplayManager, DisplayConfig
+        display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
         return Page(fitz_page, debug=config.debug_mode, display=display)
     
     def get_page(self, page_num: int) -> Page:
@@ -221,7 +223,9 @@ class PDFDocument:
             return []
         
         # Import config here to avoid circular imports
-        from ..config.settings import config, display
+        from ..config.settings import config
+        from ..ui.display_manager import DisplayManager, DisplayConfig
+        display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
         return [Page(self._doc[i], debug=config.debug_mode, display=display) for i in range(len(self._doc))]
     
     @property

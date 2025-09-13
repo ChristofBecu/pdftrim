@@ -3,8 +3,10 @@
 import os
 from typing import Optional
 
+from ..di.interfaces import IConfig
 
-class Config:
+
+class Config(IConfig):
     """Centralized configuration for PDF trimmer."""
     
     # Default values
@@ -101,7 +103,3 @@ class Config:
 
 # Global config instance
 config = Config()
-
-# Global display manager instance
-from ..ui.display_manager import DisplayManager
-display = DisplayManager()
