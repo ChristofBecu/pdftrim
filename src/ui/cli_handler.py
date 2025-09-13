@@ -6,7 +6,7 @@ parsing, validation, and user interface messaging.
 """
 
 import sys
-from typing import Tuple, Optional, List
+from typing import Optional, List
 from dataclasses import dataclass
 
 from ..config.settings import config

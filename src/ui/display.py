@@ -7,7 +7,7 @@ separating presentation logic from business logic.
 
 import sys
 from enum import Enum
-from typing import List, Optional, Any
+from typing import List, Optional
 from dataclasses import dataclass
 
 from ..di.interfaces import IDisplayManager

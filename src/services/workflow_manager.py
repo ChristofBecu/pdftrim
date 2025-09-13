@@ -6,8 +6,7 @@ PDF processing workflows, handling both single file and batch processing
 with consistent error handling, progress reporting, and output management.
 """
 
-from typing import Optional, List, Tuple
-from pathlib import Path
+from typing import Optional, Tuple
 
 from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, IConfig
 

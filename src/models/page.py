@@ -1,6 +1,5 @@
 """Page model for PDF processing."""
 
-import fitz
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:

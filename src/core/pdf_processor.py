@@ -5,8 +5,7 @@ This module provides the PDFProcessor class that orchestrates the entire PDF
 trimming workflow, coordinating between text finding and page manipulation.
 """
 
-import os
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 from pathlib import Path
 import fitz  # PyMuPDF
 
