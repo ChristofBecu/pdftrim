@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from fitz import Page as FitzPage
 
-from ..ui.display_manager import DisplayManager
+from ..ui.display import DisplayManager
 
 
 class Page:

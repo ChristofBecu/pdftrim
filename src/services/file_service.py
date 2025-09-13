@@ -1,7 +1,7 @@
 """
-File manager for PDF operations.
+File service for PDF operations.
 
-This module provides the FileManager class for handling all file operations
+This module provides the FileService class for handling all file operations
 including file discovery, path validation, output filename generation, and
 directory management.
 """
@@ -12,7 +12,7 @@ from typing import List, Optional, Union, Tuple
 from pathlib import Path
 
 from ..config.settings import config
-from ..ui.display_manager import DisplayManager, DisplayConfig
+from ..ui.display import DisplayManager, DisplayConfig
 from ..di.interfaces import IFileManager
 
 
@@ -21,11 +21,11 @@ class FileValidationError(Exception):
     pass
 
 
-class FileManager(IFileManager):
+class FileService(IFileManager):
     """
-    A class for managing all file operations in the PDF trimmer.
+    A service for managing all file operations in the PDF trimmer.
     
-    This class handles file discovery, validation, path generation, and
+    This service handles file discovery, validation, path generation, and
     directory management operations.
     """
     

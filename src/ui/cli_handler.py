@@ -10,7 +10,7 @@ from typing import Tuple, Optional, List
 from dataclasses import dataclass
 
 from ..config.settings import config
-from ..ui.display_manager import DisplayManager
+from .display import DisplayManager
 from ..di.interfaces import ICLIHandler
 
 

@@ -13,7 +13,7 @@ from ..di.interfaces import (
     IApplicationController, ICLIHandler, IDisplayManager, 
     IFileManager, IPDFProcessor, IConfig
 )
-from ..workflow.workflow_manager import WorkflowManager
+from ..services.workflow_manager import WorkflowManager
 
 
 class ApplicationController(IApplicationController):

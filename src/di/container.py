@@ -13,12 +13,12 @@ from .interfaces import (
     IPDFProcessor, ICLIHandler, IConfig, IApplicationController
 )
 from ..config.settings import Config
-from ..ui.display_manager import DisplayManager, DisplayConfig
-from ..utils.file_manager import FileManager
-from ..models.text_search_engine import TextSearchEngine
-from ..models.pdf_processor import PDFProcessor
-from ..cli.cli_handler import CLIHandler
-from ..controllers.application_controller import ApplicationController
+from ..ui.display import DisplayManager, DisplayConfig
+from ..services.file_service import FileService
+from ..core.text_search import TextSearchEngine
+from ..core.pdf_processor import PDFProcessor
+from ..ui.cli_handler import CLIHandler
+from ..ui.controllers import ApplicationController
 
 
 T = TypeVar('T')
@@ -132,13 +132,13 @@ class DependencyContainer:
         
         self.register_singleton(IDisplayManager, create_display_manager)
         
-        # Register FileManager as singleton
-        def create_file_manager() -> FileManager:
+        # Register FileService as singleton
+        def create_file_manager() -> FileService:
             config = self.resolve(IConfig)
             display = self.resolve(IDisplayManager)
             # Cast to concrete type for constructor
             display_manager = cast(DisplayManager, display)
-            return FileManager(debug=config.debug_mode, display_manager=display_manager)
+            return FileService(debug=config.debug_mode, display_manager=display_manager)
         
         self.register_singleton(IFileManager, create_file_manager)
         
@@ -231,11 +231,11 @@ class DependencyContainer:
         self.register_singleton(IDisplayManager, create_display_manager)
         
         # Register other components that depend on config and display
-        def create_file_manager() -> FileManager:
+        def create_file_manager() -> FileService:
             config = self.resolve(IConfig)
             display = self.resolve(IDisplayManager)
             display_manager = cast(DisplayManager, display)
-            return FileManager(debug=config.debug_mode, display_manager=display_manager)
+            return FileService(debug=config.debug_mode, display_manager=display_manager)
         
         self.register_singleton(IFileManager, create_file_manager)
         
@@ -274,7 +274,7 @@ class DependencyContainer:
             # Cast to concrete types for constructor
             cli_handler_concrete = cast(CLIHandler, cli_handler)
             display_concrete = cast(DisplayManager, display)
-            file_manager_concrete = cast(FileManager, file_manager)
+            file_manager_concrete = cast(FileService, file_manager)
             processor_concrete = cast(PDFProcessor, processor)
             config_concrete = cast(Config, config)
             

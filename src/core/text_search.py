@@ -10,8 +10,8 @@ from pathlib import Path
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer
 
-from .pdf_document import PDFDocument
-from ..ui.display_manager import DisplayManager, DisplayConfig
+from ..models.pdf_document import PDFDocument
+from ..ui.display import DisplayManager, DisplayConfig
 from ..di.interfaces import ITextSearchEngine
 
 

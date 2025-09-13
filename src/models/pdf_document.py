@@ -17,7 +17,7 @@ class PDFDocument:
             file_path: Path to PDF file, or None to create empty document
         """
         self.file_path = str(file_path) if file_path else None
-        self._doc = None
+        self._doc: Optional[fitz.Document] = None
         self._is_open = False
         
         if file_path:
@@ -108,7 +108,7 @@ class PDFDocument:
         fitz_page = self._doc[page_num]
         # Import config here to avoid circular imports
         from ..config.settings import config
-        from ..ui.display_manager import DisplayManager, DisplayConfig
+        from ..ui.display import DisplayManager, DisplayConfig
         display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
         return Page(fitz_page, debug=config.debug_mode, display=display)
     
@@ -158,7 +158,7 @@ class PDFDocument:
         if self._doc is None or not self._is_open:
             raise RuntimeError("Document is not open")
         
-        return self._doc.new_page(width=width, height=height)
+        return self._doc.new_page(width=width, height=height)  # type: ignore[attr-defined]
     
     def delete_page(self, page_num: int) -> None:
         """
@@ -191,7 +191,7 @@ class PDFDocument:
         results = []
         for page_num in range(len(self._doc)):
             fitz_page = self._doc[page_num]  # Get raw fitz page
-            text_instances = fitz_page.search_for(text)
+            text_instances = fitz_page.search_for(text)  # type: ignore[attr-defined]
             
             if text_instances:
                 y_coord = text_instances[0].y0  # Top Y coordinate of first occurrence
@@ -224,7 +224,7 @@ class PDFDocument:
         
         # Import config here to avoid circular imports
         from ..config.settings import config
-        from ..ui.display_manager import DisplayManager, DisplayConfig
+        from ..ui.display import DisplayManager, DisplayConfig
         display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
         return [Page(self._doc[i], debug=config.debug_mode, display=display) for i in range(len(self._doc))]
     
