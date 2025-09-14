@@ -33,22 +33,6 @@ class Page:
         """Get text content from page."""
         return self._page.get_text(option)
     
-    def get_drawings(self) -> list:
-        """Get drawing objects from page."""
-        return self._page.get_drawings()
-    
-    def get_images(self) -> list:
-        """Get image objects from page."""
-        return self._page.get_images()
-    
-    def search_for(self, text: str) -> list:
-        """Search for text on page."""
-        return self._page.search_for(text)
-    
-    def show_pdf_page(self, *args, **kwargs):
-        """Show PDF page content."""
-        return self._page.show_pdf_page(*args, **kwargs)
-    
     def is_blank(self) -> bool:
         """
         Check if page is blank or contains only decorative content without meaningful text.
@@ -75,8 +59,8 @@ class Page:
         
         # Get page dimensions for analysis
         rect = self.rect
-        drawings = self.get_drawings()
-        images = self.get_images()
+        drawings = self._page.get_drawings()
+        images = self._page.get_images()
         
         # Special case: if there's no text AND it's likely a template/decorative page
         if len(meaningful_text) == 0:
