@@ -1,10 +1,21 @@
 """Page model for PDF processing."""
 
-from typing import TYPE_CHECKING, Optional, Any
+from typing import TYPE_CHECKING, Optional, Protocol
 import fitz
 
 if TYPE_CHECKING:
-    from fitz import Page as FitzPage
+    class PyMuPDFPageProtocol(Protocol):
+        """Protocol defining the PyMuPDF Page interface we use."""
+        rect: fitz.Rect
+        
+        def get_text(self, option: str = "text") -> str: ...
+        def get_drawings(self) -> list: ...
+        def get_images(self) -> list: ...
+    
+    FitzPage = PyMuPDFPageProtocol
+else:
+    # At runtime, we don't need the protocol
+    FitzPage = object
 
 from ..ui.display import DisplayManager
 
@@ -21,7 +32,7 @@ class Page:
             debug: Enable debug logging
             display: DisplayManager instance for output
         """
-        self._page: Any = fitz_page  # Use Any to avoid type checker issues
+        self._page: 'FitzPage' = fitz_page
         self.debug = debug
         self.display = display or DisplayManager()
     
