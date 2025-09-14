@@ -1,6 +1,6 @@
 """Page model for PDF processing."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 import fitz
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class Page:
             debug: Enable debug logging
             display: DisplayManager instance for output
         """
-        self._page = fitz_page
+        self._page: Any = fitz_page  # Use Any to avoid type checker issues
         self.debug = debug
         self.display = display or DisplayManager()
     
