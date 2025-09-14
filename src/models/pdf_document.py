@@ -7,21 +7,30 @@ from .page import Page
 
 if TYPE_CHECKING:
     from types import TracebackType
+    from ..ui.display import DisplayManager
 
 
 class PDFDocument:
     """Wrapper class for PyMuPDF document objects with enhanced functionality."""
     
-    def __init__(self, file_path: Optional[Union[str, Path]] = None):
+    def __init__(self, file_path: Optional[Union[str, Path]] = None, 
+                 debug: Optional[bool] = None,
+                 display_manager: Optional['DisplayManager'] = None):
         """
         Initialize PDF document wrapper.
         
         Args:
             file_path: Path to PDF file, or None to create empty document
+            debug: Enable debug mode (uses config default if None)
+            display_manager: Optional DisplayManager for Page instances
         """
         self.file_path = str(file_path) if file_path else None
         self._doc: Optional[fitz.Document] = None
         self._is_open = False
+        
+        # Store dependencies for Page creation
+        self._debug = debug
+        self._display_manager = display_manager
         
         if file_path:
             self.open(file_path)
@@ -29,6 +38,28 @@ class PDFDocument:
             # Create empty document
             self._doc = fitz.open()  # Creates empty document
             self._is_open = True
+    
+    def _create_page_instance(self, fitz_page) -> Page:
+        """
+        Create a Page instance with proper dependencies.
+        
+        Args:
+            fitz_page: PyMuPDF page object
+            
+        Returns:
+            Page wrapper instance
+        """
+        # Lazy import to avoid circular imports, but only once per document
+        if self._display_manager is None:
+            from ..config.settings import config
+            from ..ui.display import DisplayManager, DisplayConfig
+            debug_mode = self._debug if self._debug is not None else config.debug_mode
+            self._display_manager = DisplayManager(DisplayConfig(debug_enabled=debug_mode))
+            self._debug = debug_mode
+        
+        # Ensure debug is not None
+        debug_mode = self._debug if self._debug is not None else False
+        return Page(fitz_page, debug=debug_mode, display=self._display_manager)
     
     def open(self, file_path: Union[str, Path]) -> 'PDFDocument':
         """
@@ -110,11 +141,7 @@ class PDFDocument:
             raise IndexError(f"Page {page_num} out of range (0-{len(self._doc)-1})")
         
         fitz_page = self._doc[page_num]
-        # Import config here to avoid circular imports
-        from ..config.settings import config
-        from ..ui.display import DisplayManager, DisplayConfig
-        display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
-        return Page(fitz_page, debug=config.debug_mode, display=display)
+        return self._create_page_instance(fitz_page)
     
     def get_page(self, page_num: int) -> Page:
         """
@@ -226,11 +253,7 @@ class PDFDocument:
         if self._doc is None or not self._is_open:
             return []
         
-        # Import config here to avoid circular imports
-        from ..config.settings import config
-        from ..ui.display import DisplayManager, DisplayConfig
-        display = DisplayManager(DisplayConfig(debug_enabled=config.debug_mode))
-        return [Page(self._doc[i], debug=config.debug_mode, display=display) for i in range(len(self._doc))]
+        return [self._create_page_instance(self._doc[i]) for i in range(len(self._doc))]
     
     @property
     def is_open(self) -> bool:
