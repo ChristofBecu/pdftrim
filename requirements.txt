@@ -1,0 +1,44 @@
+# PDF Trimmer - Python Dependencies
+# =================================
+#
+# Python Version: Requires Python 3.10+ for optimal type hint support
+# Tested with: Python 3.13.7
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# EXTERNAL DEPENDENCIES:
+
+# PDF Processing Library
+# PyMuPDF provides the 'fitz' module for PDF manipulation
+# Also installs: pymupdf, mupdf (internal dependencies)
+PyMuPDF>=1.24.0,<2.0.0
+
+# STANDARD LIBRARY MODULES (No installation needed):
+# The following modules are used but are part of Python's standard library:
+#   - sys          (system-specific parameters and functions)
+#   - os           (operating system interface)  
+#   - glob         (filename pattern matching)
+#   - typing       (type hints support)
+#   - pathlib      (object-oriented filesystem paths)
+#   - dataclasses  (data class decorator)
+#   - abc          (abstract base classes)
+#   - enum         (enumeration support)
+#   - types        (dynamic type creation and names)
+#   - traceback    (print or retrieve stack traceback)
+
+# DEVELOPMENT DEPENDENCIES (Optional):
+# Uncomment these if you want to contribute to the project:
+#
+# Type checking
+# mypy>=1.0.0
+#
+# Code formatting  
+# black>=22.0.0
+#
+# Linting
+# ruff>=0.1.0
+#
+# Testing (when tests are added)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
