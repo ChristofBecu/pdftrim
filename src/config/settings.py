@@ -87,13 +87,6 @@ class Config(IConfig):
         """Set processed file suffix."""
         self._processed_suffix = value
     
-    def create_output_filename(self, input_file: str, output_dir: Optional[str] = None) -> str:
-        """Generate output filename in the specified output directory."""
-        output_directory = output_dir or self.output_dir
-        filename = os.path.basename(input_file)
-        base, ext = os.path.splitext(filename)
-        return os.path.join(output_directory, f"{base}{self.output_suffix}{ext}")
-    
     def __repr__(self) -> str:
         """String representation of configuration."""
         return (f"Config(debug={self.debug_mode}, "
