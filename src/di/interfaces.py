@@ -106,31 +106,6 @@ class ICLIHandler(ABC):
     def display_help(self) -> None:
         """Display comprehensive help information."""
         pass
-    
-    @abstractmethod
-    def display_processing_start(self, count: int, search_string: str, output_dir: str) -> None:
-        """Display processing start information."""
-        pass
-    
-    @abstractmethod
-    def display_processing_complete(self, successful: int, failed: int) -> None:
-        """Display processing completion summary."""
-        pass
-    
-    @abstractmethod
-    def display_result(self, result) -> None:
-        """Display a processing result."""
-        pass
-    
-    @abstractmethod
-    def display_no_files_found(self, file_type: str = "PDF files") -> None:
-        """Display a message when no files are found."""
-        pass
-    
-    @abstractmethod
-    def display_file_list(self, files: List[str], title: str = "Files to process:") -> None:
-        """Display a list of files."""
-        pass
 
 
 class IConfig(ABC):

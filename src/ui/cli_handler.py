@@ -197,146 +197,20 @@ class CLIHandler(ICLIHandler):
         """
         self.display.error(message)
     
-    def display_no_files_found(self, file_type: str = "PDF files") -> None:
-        """
-        Display a message when no files are found.
-        
-        Args:
-            file_type: Type of files that were not found
-        """
-        print(f"No {file_type} found in current directory.")
     
-    def display_result(self, result) -> None:
-        """
-        Display a processing result.
-        
-        Args:
-            result: Result object to display
-        """
-        print(result)
+
     
-    def display_info(self, message: str) -> None:
-        """
-        Display an informational message to the user.
-        
-        Args:
-            message: Information message to display
-        """
-        print(message)
+
     
-    def display_debug(self, message: str) -> None:
-        """
-        Display a debug message if debug mode is enabled.
-        
-        Args:
-            message: Debug message to display
-        """
-        if self.debug:
-            print(f"[DEBUG] {message}")
+
     
-    def confirm_action(self, message: str, default: bool = True) -> bool:
-        """
-        Ask user for confirmation.
-        
-        Args:
-            message: Confirmation prompt message
-            default: Default response if user just presses Enter
-            
-        Returns:
-            True if user confirms, False otherwise
-        """
-        prompt_suffix = " [Y/n]" if default else " [y/N]"
-        response = input(f"{message}{prompt_suffix}: ").strip().lower()
-        
-        if not response:
-            return default
-        
-        return response in ['y', 'yes', 'true', '1']
+
     
-    def display_processing_start(self, file_count: int, search_string: str, output_dir: str) -> None:
-        """
-        Display processing start information.
-        
-        Args:
-            file_count: Number of files to process
-            search_string: Search string being used
-            output_dir: Output directory path
-        """
-        if file_count == 1:
-            print(f"Processing 1 PDF file")
-        else:
-            print(f"Processing {file_count} PDF files")
-        
-        print(f"Search string: '{search_string}'")
-        print(f"Output directory: {output_dir}")
-        print("-" * 50)
+
     
-    def display_processing_complete(self, successful: int, failed: int) -> None:
-        """
-        Display processing completion summary.
-        
-        Args:
-            successful: Number of successfully processed files
-            failed: Number of failed files
-        """
-        print("-" * 50)
-        print(f"Processing complete: {successful} successful, {failed} failed")
+
     
-    def display_file_list(self, files: List[str], title: str = "Files to process:") -> None:
-        """
-        Display a list of files.
-        
-        Args:
-            files: List of file paths
-            title: Title for the file list
-        """
-        import os
-        
-        print(f"{title}")
-        for file_path in files:
-            print(f"  - {os.path.basename(file_path)}")
+
     
-    def get_user_input(self, prompt: str, validate_func=None) -> str:
-        """
-        Get user input with optional validation.
-        
-        Args:
-            prompt: Prompt message to display
-            validate_func: Optional function to validate input
-            
-        Returns:
-            Validated user input
-        """
-        while True:
-            user_input = input(f"{prompt}: ").strip()
-            
-            if validate_func:
-                try:
-                    if validate_func(user_input):
-                        return user_input
-                    else:
-                        self.display.warning("Invalid input. Please try again.")
-                except Exception as e:
-                    self.display.error(f"Validation error: {e}")
-            else:
-                return user_input
+
     
-    def validate_search_string(self, search_string: str) -> bool:
-        """
-        Validate search string input.
-        
-        Args:
-            search_string: Search string to validate
-            
-        Returns:
-            True if valid, False otherwise
-        """
-        if not search_string or not search_string.strip():
-            print("Search string cannot be empty.")
-            return False
-        
-        if len(search_string.strip()) < 2:
-            print("Search string must be at least 2 characters long.")
-            return False
-        
-        return True
