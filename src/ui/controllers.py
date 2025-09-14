@@ -7,7 +7,10 @@ between CLI handling, processing, and output.
 """
 
 import sys
-from typing import Optional, List, Any
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..ui.cli_handler import ParsedArguments
 
 from ..di.interfaces import (
     IApplicationController, ICLIHandler, IDisplayManager, 
@@ -94,7 +97,7 @@ class ApplicationController(IApplicationController):
                 self.display.error(f"Traceback: {traceback.format_exc()}")
             return 1
     
-    def _parse_arguments(self, args: Optional[List[str]]) -> Optional[Any]:
+    def _parse_arguments(self, args: Optional[List[str]]) -> Optional['ParsedArguments']:
         """
         Parse command line arguments using the CLI handler.
         

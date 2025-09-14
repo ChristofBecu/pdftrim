@@ -6,8 +6,12 @@ and improve testability throughout the application.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple, Union, Any
+from typing import Optional, List, Tuple, Union, TYPE_CHECKING
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from ..models.result import ProcessingResult
+    from ..ui.cli_handler import ParsedArguments
 
 
 class IDisplayManager(ABC):
@@ -78,7 +82,7 @@ class IPDFProcessor(ABC):
     
     @abstractmethod
     def process_pdf(self, input_file: Union[str, Path], search_string: str, 
-                   output_dir: Union[str, Path]) -> Any:
+                   output_dir: Union[str, Path]) -> 'ProcessingResult':
         """Process a PDF file with trimming based on search string."""
         pass
     
@@ -93,7 +97,7 @@ class ICLIHandler(ABC):
     """Interface for command line interface operations."""
     
     @abstractmethod
-    def handle_arguments(self, args: Optional[List[str]] = None) -> Any:
+    def handle_arguments(self, args: Optional[List[str]] = None) -> 'ParsedArguments':
         """Parse arguments and handle special cases."""
         pass
     

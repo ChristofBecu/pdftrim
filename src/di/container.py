@@ -5,7 +5,7 @@ This module provides a centralized dependency injection container that handles
 component creation, wiring, and lifecycle management throughout the application.
 """
 
-from typing import Optional, Dict, Any, TypeVar, Type, Callable, cast
+from typing import Optional, Dict, TypeVar, Type, Callable, cast
 from dataclasses import dataclass
 
 from .interfaces import (
@@ -27,7 +27,7 @@ T = TypeVar('T')
 @dataclass
 class ComponentRegistration:
     """Registration information for a component."""
-    factory: Callable[[], Any]
+    factory: Callable[[], object]
     singleton: bool = True
 
 
@@ -46,7 +46,7 @@ class DependencyContainer:
             debug_mode: Optional debug mode override
         """
         self._registrations: Dict[Type, ComponentRegistration] = {}
-        self._singletons: Dict[Type, Any] = {}
+        self._singletons: Dict[Type, object] = {}
         self._debug_mode = debug_mode
         self._register_default_components()
     
@@ -84,15 +84,15 @@ class DependencyContainer:
         if registration.singleton:
             # Return cached singleton if available
             if interface in self._singletons:
-                return self._singletons[interface]
+                return cast(T, self._singletons[interface])
             
             # Create and cache singleton
             instance = registration.factory()
             self._singletons[interface] = instance
-            return instance
+            return cast(T, instance)
         else:
             # Create new transient instance
-            return registration.factory()
+            return cast(T, registration.factory())
     
     def _register_default_components(self) -> None:
         """Register default component factories."""

@@ -1,9 +1,12 @@
 """PDF Document wrapper for enhanced document management."""
 
 import fitz
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 from .page import Page
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 
 class PDFDocument:
@@ -75,11 +78,12 @@ class PDFDocument:
         
         self._doc.save(str(output_path))
     
-    def __enter__(self):
+    def __enter__(self) -> 'PDFDocument':
         """Context manager entry."""
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], 
+                 exc_tb: Optional['TracebackType']) -> None:
         """Context manager exit - ensures document is closed."""
         self.close()
     
@@ -144,7 +148,7 @@ class PDFDocument:
         self._doc.insert_pdf(other_doc._doc, start_at=start_at, 
                             from_page=from_page, to_page=to_page)
     
-    def new_page(self, width: float = 595, height: float = 842) -> Any:
+    def new_page(self, width: float = 595, height: float = 842) -> fitz.Page:
         """
         Create a new page in the document.
         

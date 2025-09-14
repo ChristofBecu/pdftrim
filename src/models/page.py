@@ -1,6 +1,7 @@
 """Page model for PDF processing."""
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
+import fitz
 
 if TYPE_CHECKING:
     from fitz import Page as FitzPage
@@ -11,7 +12,7 @@ from ..ui.display import DisplayManager
 class Page:
     """Wrapper class for PyMuPDF page objects with enhanced functionality."""
     
-    def __init__(self, fitz_page: Any, debug: bool = False, display: Optional[DisplayManager] = None):
+    def __init__(self, fitz_page: 'FitzPage', debug: bool = False, display: Optional[DisplayManager] = None):
         """
         Initialize Page wrapper.
         
@@ -25,7 +26,7 @@ class Page:
         self.display = display or DisplayManager()
     
     @property
-    def rect(self):
+    def rect(self) -> fitz.Rect:
         """Get page rectangle."""
         return self._page.rect
     
