@@ -1,7 +1,6 @@
 """Configuration management for PDF trimmer application."""
 
 import os
-from typing import Optional
 
 from ..di.interfaces import IConfig
 
@@ -52,40 +51,20 @@ class Config(IConfig):
         """Get default output directory."""
         return self._output_dir
     
-    @output_dir.setter
-    def output_dir(self, value: str) -> None:
-        """Set output directory."""
-        self._output_dir = value
-    
     @property
     def output_suffix(self) -> str:
         """Get output file suffix."""
         return self._output_suffix
-    
-    @output_suffix.setter
-    def output_suffix(self, value: str) -> None:
-        """Set output file suffix."""
-        self._output_suffix = value
     
     @property
     def pdf_pattern(self) -> str:
         """Get PDF file search pattern."""
         return self._pdf_pattern
     
-    @pdf_pattern.setter
-    def pdf_pattern(self, value: str) -> None:
-        """Set PDF file search pattern."""
-        self._pdf_pattern = value
-    
     @property
     def processed_suffix(self) -> str:
         """Get processed file suffix to skip."""
         return self._processed_suffix
-    
-    @processed_suffix.setter
-    def processed_suffix(self, value: str) -> None:
-        """Set processed file suffix."""
-        self._processed_suffix = value
     
     def __repr__(self) -> str:
         """String representation of configuration."""
