@@ -11,7 +11,7 @@ from pathlib import Path
 
 if TYPE_CHECKING:
     from ..models.result import ProcessingResult
-    from ..ui.cli_handler import ParsedArguments
+    from ..ui.cli_handler import ParsedArguments, CLIResult
 
 
 class IDisplayManager(ABC):
@@ -99,6 +99,11 @@ class ICLIHandler(ABC):
     @abstractmethod
     def handle_arguments(self, args: Optional[List[str]] = None) -> 'ParsedArguments':
         """Parse arguments and handle special cases."""
+        pass
+    
+    @abstractmethod
+    def handle_arguments_with_result(self, args: Optional[List[str]] = None) -> 'CLIResult':
+        """Parse arguments and return result without calling sys.exit()."""
         pass
     
     @abstractmethod

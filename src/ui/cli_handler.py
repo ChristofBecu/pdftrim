@@ -33,6 +33,24 @@ class ParsedArguments:
             raise CLIError("Search string cannot be empty")
 
 
+@dataclass
+class CLIResult:
+    """Result of CLI argument handling."""
+    should_exit: bool = False
+    exit_code: int = 0
+    parsed_args: Optional[ParsedArguments] = None
+    
+    @classmethod
+    def exit_with_code(cls, code: int) -> 'CLIResult':
+        """Create a result that indicates the application should exit with the given code."""
+        return cls(should_exit=True, exit_code=code)
+    
+    @classmethod
+    def success_with_args(cls, args: ParsedArguments) -> 'CLIResult':
+        """Create a result with successfully parsed arguments."""
+        return cls(should_exit=False, exit_code=0, parsed_args=args)
+
+
 class CLIHandler(ICLIHandler):
     """
     A class for handling command line interface operations.
@@ -150,9 +168,47 @@ class CLIHandler(ICLIHandler):
         """Display version information."""
         print(f"{self.APP_NAME} v{self.VERSION}")
     
+    def handle_arguments_with_result(self, args: Optional[List[str]] = None) -> CLIResult:
+        """
+        Parse arguments and handle special cases, returning a result instead of exiting.
+        
+        Args:
+            args: List of arguments to parse (defaults to sys.argv[1:])
+            
+        Returns:
+            CLIResult indicating whether to exit and with what code, or parsed arguments
+        """
+        if args is None:
+            args = sys.argv[1:]
+        
+        # Handle special arguments first, regardless of other arguments
+        if not args or any(arg in ['-h', '--help', 'help'] for arg in args):
+            self.display_help()
+            return CLIResult.exit_with_code(0)
+        
+        if any(arg in ['-v', '--version', 'version'] for arg in args):
+            self.display_version()
+            return CLIResult.exit_with_code(0)
+        
+        try:
+            parsed_args = self.parse_arguments(args)
+            
+            if self.debug:
+                print(f"[DEBUG] Parsed arguments: {parsed_args}")
+            
+            return CLIResult.success_with_args(parsed_args)
+            
+        except CLIError as e:
+            self.display_error(str(e))
+            self.display_usage()
+            return CLIResult.exit_with_code(1)
+
     def handle_arguments(self, args: Optional[List[str]] = None) -> ParsedArguments:
         """
         Parse arguments and handle special cases (help, version, etc.).
+        
+        DEPRECATED: This method still calls sys.exit() for backward compatibility.
+        Use handle_arguments_with_result() for better testability.
         
         Args:
             args: List of arguments to parse (defaults to sys.argv[1:])
@@ -163,30 +219,16 @@ class CLIHandler(ICLIHandler):
         Raises:
             SystemExit: If help/version is requested or arguments are invalid
         """
-        if args is None:
-            args = sys.argv[1:]
+        result = self.handle_arguments_with_result(args)
         
-        # Handle special arguments first, regardless of other arguments
-        if not args or any(arg in ['-h', '--help', 'help'] for arg in args):
-            self.display_help()
-            sys.exit(0)
+        if result.should_exit:
+            sys.exit(result.exit_code)
         
-        if any(arg in ['-v', '--version', 'version'] for arg in args):
-            self.display_version()
-            sys.exit(0)
-        
-        try:
-            parsed_args = self.parse_arguments(args)
-            
-            if self.debug:
-                print(f"[DEBUG] Parsed arguments: {parsed_args}")
-            
-            return parsed_args
-            
-        except CLIError as e:
-            self.display_error(str(e))
-            self.display_usage()
+        if result.parsed_args is None:
+            # This shouldn't happen, but handle it gracefully
             sys.exit(1)
+            
+        return result.parsed_args
     
     def display_error(self, message: str) -> None:
         """

@@ -107,25 +107,21 @@ class ApplicationController(IApplicationController):
         Returns:
             Parsed arguments object, or None if help/version was shown
         """
-        try:
-            if args is None:
-                args = sys.argv[1:]
-            
-            # Check for help/version requests that cause sys.exit()
-            if not args or any(arg in ['-h', '--help', 'help', '-v', '--version', 'version'] for arg in args):
-                # Let CLI handler display help/version and exit
-                self.cli_handler.handle_arguments(args)
-                return None  # This won't be reached due to sys.exit() in CLI handler
-            
-            # Parse normal arguments
-            return self.cli_handler.handle_arguments(args)
-            
-        except SystemExit as e:
-            # Handle sys.exit() from CLI handler (help/version display)
-            if e.code == 0:
-                return None  # Normal help/version exit
+        # Import the CLIResult type
+        from .cli_handler import CLIResult
+        
+        # Use the new method that returns a result instead of calling sys.exit()
+        result = self.cli_handler.handle_arguments_with_result(args)
+        
+        if result.should_exit:
+            # For help/version (exit code 0), return None to indicate normal exit
+            # For errors (exit code != 0), raise SystemExit to propagate the error
+            if result.exit_code == 0:
+                return None
             else:
-                raise  # Re-raise for error exits
+                raise SystemExit(result.exit_code)
+        
+        return result.parsed_args
     
     def _execute_workflow(self, parsed_args) -> bool:
         """
