@@ -138,29 +138,85 @@ class ApplicationController(IApplicationController):
             input_path = getattr(parsed_args, 'input_path', None)
             search_string = getattr(parsed_args, 'search_string', '')
             operation = getattr(parsed_args, 'operation', 'search')
+            delete_spec = getattr(parsed_args, 'delete_spec', None)
+            before_page = getattr(parsed_args, 'before_page', None)
+            after_page = getattr(parsed_args, 'after_page', None)
             output_dir = getattr(parsed_args, 'output_dir', None)
             is_batch_mode = getattr(parsed_args, 'is_batch_mode', False)
 
-            # Step 1 implements parsing; only search trimming workflow exists today.
-            if operation != 'search':
-                self.display.error(
-                    "Requested operation is not implemented yet. "
-                    "Only --search trimming is available in the current release."
+            resolved_output_dir = output_dir or self.config.output_dir
+
+            if operation == 'search':
+                if not search_string.strip():
+                    self.display.error("Search string cannot be empty")
+                    return False
+
+                return self.workflow_manager.process_workflow(
+                    input_path=input_path if not is_batch_mode else None,
+                    search_string=search_string,
+                    output_dir=output_dir,
+                    is_batch_mode=is_batch_mode
                 )
+
+            # Delete operations (Step 2)
+            if is_batch_mode:
+                pdf_files = self.file_manager.find_pdf_files(".")
+                if not pdf_files:
+                    self.display.info("No PDF files found in current directory.")
+                    return True
+
+                successful = 0
+                failed = 0
+
+                for pdf_file in pdf_files:
+                    if operation == 'delete':
+                        result = self.processor.process_pdf_delete_pages(
+                            pdf_file, delete_spec or "", resolved_output_dir
+                        )
+                    else:
+                        result = self.processor.process_pdf_delete_before_after(
+                            pdf_file, before_page, after_page, resolved_output_dir
+                        )
+
+                    if result.success:
+                        successful += 1
+                    else:
+                        failed += 1
+                        self.display.error(f"Failed to process {pdf_file}: {result.message}")
+
+                msg = f"Processing complete: {successful} successful, {failed} failed"
+                if failed == 0:
+                    self.display.success(msg)
+                    return True
+                if successful == 0:
+                    self.display.error(msg)
+                    return False
+                self.display.warning(msg)
                 return False
 
-            # Validate required parameters for search mode
-            if not search_string.strip():
-                self.display.error("Search string cannot be empty")
+            # Single file delete ops
+            if input_path is None:
+                self.display.error("Input file is required")
                 return False
 
-            # Execute workflow
-            return self.workflow_manager.process_workflow(
-                input_path=input_path if not is_batch_mode else None,
-                search_string=search_string,
-                output_dir=output_dir,
-                is_batch_mode=is_batch_mode
-            )
+            if operation == 'delete':
+                result = self.processor.process_pdf_delete_pages(
+                    input_path, delete_spec or "", resolved_output_dir
+                )
+            else:
+                result = self.processor.process_pdf_delete_before_after(
+                    input_path, before_page, after_page, resolved_output_dir
+                )
+
+            if result.success:
+                self.display.info(f"Result: {result.message}")
+                self.display.info(f"Output: {result.output_file}")
+                self.display.success("Processing complete: 1 successful, 0 failed")
+                return True
+
+            self.display.error(f"Result: {result.message}")
+            self.display.error("Processing complete: 0 successful, 1 failed")
+            return False
             
         except Exception as e:
             self.display.error(f"Workflow execution failed: {e}")

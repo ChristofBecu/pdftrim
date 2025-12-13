@@ -19,7 +19,10 @@ class ProcessingResult:
     
     def __init__(self, success: bool, input_file: str, output_file: str = "", 
                  message: str = "", pages_trimmed: bool = False, 
-                 blank_pages_removed: int = 0, trim_page: Optional[int] = None):
+                 blank_pages_removed: int = 0, trim_page: Optional[int] = None,
+                 operation: str = "search",
+                 pages_deleted: int = 0,
+                 deleted_pages: Optional[list[int]] = None):
         self.success = success
         self.input_file = input_file
         self.output_file = output_file
@@ -27,6 +30,9 @@ class ProcessingResult:
         self.pages_trimmed = pages_trimmed
         self.blank_pages_removed = blank_pages_removed
         self.trim_page = trim_page
+        self.operation = operation
+        self.pages_deleted = pages_deleted
+        self.deleted_pages = deleted_pages
     
     def __str__(self) -> str:
         """String representation for easy display."""

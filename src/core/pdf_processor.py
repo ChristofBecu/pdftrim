@@ -12,6 +12,12 @@ import fitz  # PyMuPDF
 from ..models.pdf_document import PDFDocument
 from ..models.result import ProcessingResult
 from .text_search import TextSearchEngine
+from .page_spec import (
+    PageSpecError,
+    parse_delete_spec,
+    indices_before_page,
+    indices_after_page,
+)
 from ..config.settings import config
 from ..services.file_service import FileService, FileValidationError
 from ..ui.display import DisplayManager, DisplayConfig
@@ -93,6 +99,134 @@ class PDFProcessor(IPDFProcessor):
                 success=False,
                 input_file=str(input_file),
                 message=str(e)
+            )
+
+    def process_pdf_delete_pages(self, input_file: Union[str, Path], delete_spec: str,
+                                output_dir: Union[str, Path]) -> ProcessingResult:
+        """Delete specific pages/ranges from a PDF (1-based spec like '1-4,7')."""
+        try:
+            validated_input = self.file_manager.validate_input_file(input_file)
+            validated_output_dir = self.file_manager.ensure_output_directory(output_dir)
+            output_file = self.file_manager.create_output_filename(validated_input, validated_output_dir)
+
+            with PDFDocument(validated_input) as doc:
+                page_count = len(doc)
+                delete_result = parse_delete_spec(delete_spec, page_count=page_count)
+                indices_to_delete = delete_result.indices_0_based_desc
+
+                if len(indices_to_delete) >= page_count:
+                    return ProcessingResult(
+                        success=False,
+                        input_file=validated_input,
+                        message="Deletion would remove all pages; refusing to create an empty PDF.",
+                        operation="delete",
+                    )
+
+                for idx in indices_to_delete:
+                    doc.delete_page(idx)
+
+                blank_pages_removed = self._remove_blank_pages(doc)
+                doc.save(output_file)
+
+            deleted_pages_1_based = delete_result.as_1_based_sorted()
+            message = f"(deleted {len(deleted_pages_1_based)} page(s), removed {blank_pages_removed} blank page(s))"
+
+            return ProcessingResult(
+                success=True,
+                input_file=validated_input,
+                output_file=output_file,
+                message=message,
+                pages_trimmed=False,
+                blank_pages_removed=blank_pages_removed,
+                operation="delete",
+                pages_deleted=len(deleted_pages_1_based),
+                deleted_pages=deleted_pages_1_based,
+            )
+
+        except (FileValidationError, PageSpecError) as e:
+            return ProcessingResult(
+                success=False,
+                input_file=str(input_file),
+                message=str(e),
+                operation="delete",
+            )
+        except Exception as e:
+            return ProcessingResult(
+                success=False,
+                input_file=str(input_file),
+                message=str(e),
+                operation="delete",
+            )
+
+    def process_pdf_delete_before_after(self, input_file: Union[str, Path],
+                                       before_page: Optional[int],
+                                       after_page: Optional[int],
+                                       output_dir: Union[str, Path]) -> ProcessingResult:
+        """Delete pages before/after a 1-based page number.
+
+        Rules:
+        - before_page deletes 1..before_page-1
+        - after_page deletes after_page+1..end
+        - before_page and after_page may be combined
+        """
+        try:
+            validated_input = self.file_manager.validate_input_file(input_file)
+            validated_output_dir = self.file_manager.ensure_output_directory(output_dir)
+            output_file = self.file_manager.create_output_filename(validated_input, validated_output_dir)
+
+            with PDFDocument(validated_input) as doc:
+                page_count = len(doc)
+                indices: set[int] = set()
+
+                if before_page is not None:
+                    indices.update(indices_before_page(before_page_1_based=before_page, page_count=page_count))
+                if after_page is not None:
+                    indices.update(indices_after_page(after_page_1_based=after_page, page_count=page_count))
+
+                indices_to_delete = sorted(indices, reverse=True)
+
+                if page_count > 0 and len(indices_to_delete) >= page_count:
+                    return ProcessingResult(
+                        success=False,
+                        input_file=validated_input,
+                        message="Deletion would remove all pages; refusing to create an empty PDF.",
+                        operation="before_after",
+                    )
+
+                for idx in indices_to_delete:
+                    doc.delete_page(idx)
+
+                blank_pages_removed = self._remove_blank_pages(doc)
+                doc.save(output_file)
+
+            deleted_pages_1_based = sorted([i + 1 for i in indices_to_delete])
+            message = f"(deleted {len(deleted_pages_1_based)} page(s), removed {blank_pages_removed} blank page(s))"
+
+            return ProcessingResult(
+                success=True,
+                input_file=validated_input,
+                output_file=output_file,
+                message=message,
+                pages_trimmed=False,
+                blank_pages_removed=blank_pages_removed,
+                operation="before_after",
+                pages_deleted=len(deleted_pages_1_based),
+                deleted_pages=deleted_pages_1_based,
+            )
+
+        except (FileValidationError, PageSpecError) as e:
+            return ProcessingResult(
+                success=False,
+                input_file=str(input_file),
+                message=str(e),
+                operation="before_after",
+            )
+        except Exception as e:
+            return ProcessingResult(
+                success=False,
+                input_file=str(input_file),
+                message=str(e),
+                operation="before_after",
             )
     
     def _process_without_trimming(self, input_file: str, output_file: str) -> ProcessingResult:

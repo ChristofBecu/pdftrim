@@ -5,6 +5,7 @@ A Python utility for trimming PDF documents based on text search patterns. Remov
 ## Features
 
 - **Text-based trimming**: Remove pages starting from a specific search string
+- **Page deletion**: Delete specific pages/ranges or pages before/after a page number
 - **Blank page detection**: Automatically identify and remove blank or decorative pages
 - **Batch processing**: Process multiple PDFs in a directory or single files
 - **Flexible output**: Configurable output directory and file naming
@@ -40,6 +41,18 @@ python pdftrim.py --search "search_string"
 
 # Process a specific PDF file
 python pdftrim.py --file input.pdf --search "search_string"
+
+# Delete specific pages (1-based)
+python pdftrim.py --file input.pdf --delete "1-4,7"
+
+# Delete pages before a page number (1-based)
+python pdftrim.py --file input.pdf --before 10   # deletes pages 1-9
+
+# Delete pages after a page number (1-based)
+python pdftrim.py --file input.pdf --after 10    # deletes pages 11-end
+
+# Combine before + after (allowed)
+python pdftrim.py --file input.pdf --before 10 --after 12
 ```
 
 ### Examples
@@ -53,7 +66,22 @@ python pdftrim.py -f document.pdf -s "Appendix A"
 
 # Process with custom output directory
 PDF_TRIMMER_OUTPUT_DIR=processed python pdftrim.py -s "References"
+
+# Delete pages 1-4 and 7
+python pdftrim.py -f document.pdf -d "1-4,7"
+
+# Remove everything before page 10
+python pdftrim.py -f document.pdf -b 10
+
+# Remove everything after page 10
+python pdftrim.py -f document.pdf -a 10
 ```
+
+### Notes
+
+- Page numbers are **1-based** for all page deletion flags.
+- `--before` and `--after` can be combined; other operations are mutually exclusive.
+- The tool refuses to create an empty PDF (if an operation would delete all pages).
 
 ### Command Line Options
 
