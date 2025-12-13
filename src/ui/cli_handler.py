@@ -207,8 +207,11 @@ class CLIHandler(ICLIHandler):
         # - Only --before and --after can be combined.
         # - --search is exclusive with everything else.
         # - --delete is exclusive with everything else.
-        has_search = bool((namespace.search or "").strip())
-        has_delete = bool((namespace.delete or "").strip())
+        # Treat flag presence as selecting an operation, even if the value is
+        # empty/whitespace. This allows us to emit specific validation errors
+        # (e.g. "Search string cannot be empty") instead of "no operation".
+        has_search = namespace.search is not None
+        has_delete = namespace.delete is not None
         has_before = namespace.before is not None
         has_after = namespace.after is not None
 

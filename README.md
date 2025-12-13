@@ -140,6 +140,13 @@ src/
 
 ## Development
 
+### Running tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ### Project Structure
 
 ```text
@@ -162,10 +169,10 @@ pdftrim/
 
 ```bash
 # Enable debug logging
-PDF_TRIMMER_DEBUG=true python pdftrim.py "search_string"
+PDF_TRIMMER_DEBUG=true python pdftrim.py --search "search_string"
 
 # Debug with custom settings
-PDF_TRIMMER_DEBUG=true PDF_TRIMMER_OUTPUT_DIR=debug python pdftrim.py document.pdf "text"
+PDF_TRIMMER_DEBUG=true PDF_TRIMMER_OUTPUT_DIR=debug python pdftrim.py --file document.pdf --search "text"
 ```
 
 ## Contributing

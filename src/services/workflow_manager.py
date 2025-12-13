@@ -1,11 +1,14 @@
-"""
-Workflow management for PDF processing operations.
+"""Workflow management for PDF processing operations.
 
-This module provides the WorkflowManager class for orchestrating
-PDF processing workflows, handling both single file and batch processing
-with consistent error handling, progress reporting, and output management.
+This module provides the WorkflowManager class for orchestrating PDF processing
+workflows, handling both single file and batch processing with consistent
+error handling, progress reporting, and output management.
 """
 
+from __future__ import annotations
+
+import os
+import warnings
 from typing import Optional, Tuple
 
 from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, IConfig
@@ -44,88 +47,149 @@ class WorkflowManager:
         self.debug = debug if debug is not None else config.debug_mode
     
     def process_single_file(self, input_file: str, search_string: str, output_dir: str = "") -> bool:
+        """Process a single PDF file (DEPRECATED).
+
+        Deprecated in favor of :meth:`process_operation`.
         """
-        Process a single PDF file.
-        
-        Args:
-            input_file: Path to the PDF file to process
-            search_string: String to search for in the PDF
-            output_dir: Output directory for processed file
-            
-        Returns:
-            bool: True if processing was successful, False otherwise
-        """
+        warnings.warn(
+            "WorkflowManager.process_single_file() is deprecated; use process_operation() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.process_operation(
+            operation="search",
+            input_path=input_file,
+            output_dir=output_dir or "",
+            is_batch_mode=False,
+            search_string=search_string,
+        )
+
+    def _process_single_operation(
+        self,
+        *,
+        operation: str,
+        input_file: str,
+        output_dir: str,
+        search_string: str = "",
+        delete_spec: str = "",
+        before_page: Optional[int] = None,
+        after_page: Optional[int] = None,
+    ) -> bool:
         resolved_output_dir = self.file_manager.ensure_output_directory(output_dir or self.config.output_dir)
-        
-        # Show processing start
+
         self.display.info(f"Processing file: {input_file}")
-        self.display.info(f"Search string: '{search_string}'")
+        if operation == "search":
+            self.display.info(f"Search string: '{search_string}'")
+        elif operation == "delete":
+            self.display.info(f"Delete spec: '{delete_spec}'")
+        elif operation == "before_after":
+            if before_page is not None:
+                self.display.info(f"Before page: {before_page}")
+            if after_page is not None:
+                self.display.info(f"After page: {after_page}")
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+
         self.display.info(f"Output directory: {resolved_output_dir}")
-        
-        # Process the file
-        result = self.processor.process_pdf(input_file, search_string, resolved_output_dir)
-        
-        # Show result
-        self.display.info(f"Result: {result.message}")
+
+        if operation == "search":
+            result = self.processor.process_pdf(input_file, search_string, resolved_output_dir)
+        elif operation == "delete":
+            result = self.processor.process_pdf_delete_pages(input_file, delete_spec, resolved_output_dir)
+        else:
+            result = self.processor.process_pdf_delete_before_after(
+                input_file,
+                before_page,
+                after_page,
+                resolved_output_dir,
+            )
+
         if result.success:
+            self.display.info(f"Result: {result.message}")
             self.display.info(f"Output: {result.output_file}")
-        
-        if result.success:
             self.display.success("Processing complete: 1 successful, 0 failed")
             return True
-        else:
-            self.display.error("Processing complete: 0 successful, 1 failed")
-            return False
+
+        self.display.error(f"Result: {result.message}")
+        self.display.error("Processing complete: 0 successful, 1 failed")
+        return False
     
     def process_batch(self, search_string: str, output_dir: Optional[str] = None) -> Tuple[int, int]:
+        """Process all PDF files in the current directory (DEPRECATED).
+
+        Deprecated in favor of :meth:`process_operation`.
         """
-        Process all PDF files in the current directory.
-        
-        Args:
-            search_string: Text to search for as the cutoff point
-            output_dir: Directory to save output files (uses config default if None)
-            
-        Returns:
-            Tuple of (successful_count, failed_count)
-        """
-        # Handle output directory defaulting
+        warnings.warn(
+            "WorkflowManager.process_batch() is deprecated; use process_operation() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._process_batch_operation(
+            operation="search",
+            output_dir=output_dir,
+            search_string=search_string,
+        )
+
+    def _process_batch_operation(
+        self,
+        *,
+        operation: str,
+        output_dir: Optional[str] = None,
+        search_string: str = "",
+        delete_spec: str = "",
+        before_page: Optional[int] = None,
+        after_page: Optional[int] = None,
+    ) -> Tuple[int, int]:
         resolved_output_dir = output_dir or self.config.output_dir
         resolved_output_dir = self.file_manager.ensure_output_directory(resolved_output_dir)
-        
-        # Find PDF files using FileManager
+
         pdf_files = self.file_manager.find_pdf_files()
-        
-        # Check if any files were found
         if not pdf_files:
             self.display.info("No PDF files found in current directory.")
             return 0, 0
-        
-        # Display file list and processing start
+
         self.display.info(f"Found {len(pdf_files)} PDF file(s) to process:")
         for pdf_file in pdf_files:
-            import os
             self.display.info(f"  - {os.path.basename(pdf_file)}")
-        
+
         self.display.info(f"Processing {len(pdf_files)} PDF files")
-        self.display.info(f"Search string: '{search_string}'")
+        if operation == "search":
+            self.display.info(f"Search string: '{search_string}'")
+        elif operation == "delete":
+            self.display.info(f"Delete spec: '{delete_spec}'")
+        elif operation == "before_after":
+            if before_page is not None:
+                self.display.info(f"Before page: {before_page}")
+            if after_page is not None:
+                self.display.info(f"After page: {after_page}")
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+
         self.display.info(f"Output directory: {resolved_output_dir}")
         self.display.info("-" * 50)
-        
-        # Process each file
+
         successful = 0
         failed = 0
-        
+
         for pdf_file in pdf_files:
-            result = self.processor.process_pdf(pdf_file, search_string, resolved_output_dir)
-            
+            if operation == "search":
+                result = self.processor.process_pdf(pdf_file, search_string, resolved_output_dir)
+            elif operation == "delete":
+                result = self.processor.process_pdf_delete_pages(pdf_file, delete_spec, resolved_output_dir)
+            else:
+                result = self.processor.process_pdf_delete_before_after(
+                    pdf_file,
+                    before_page,
+                    after_page,
+                    resolved_output_dir,
+                )
+
             if result.success:
                 successful += 1
             else:
                 failed += 1
-                # Display individual file error
                 self.display.error(f"Failed to process {pdf_file}: {result.message}")
-        
-        # Display completion status
+
         self.display.info("-" * 50)
         message = f"Processing complete: {successful} successful, {failed} failed"
         if failed == 0:
@@ -134,33 +198,65 @@ class WorkflowManager:
             self.display.error(message)
         else:
             self.display.warning(message)
-        
+
         return successful, failed
     
     def process_workflow(self, input_path: Optional[str], search_string: str, 
                         output_dir: Optional[str] = None, is_batch_mode: bool = False) -> bool:
+        """Process workflow based on input parameters (DEPRECATED).
+
+        Deprecated in favor of :meth:`process_operation`.
         """
-        Process workflow based on input parameters.
-        
-        This is a high-level method that determines whether to use single file
-        or batch processing based on the parameters.
-        
-        Args:
-            input_path: Path to input file (None for batch mode)
-            search_string: Text to search for as the cutoff point
-            output_dir: Directory to save output files (uses config default if None)
-            is_batch_mode: True for batch processing, False for single file
-            
-        Returns:
-            True if all processing was successful, False if any failures occurred
+        warnings.warn(
+            "WorkflowManager.process_workflow() is deprecated; use process_operation() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.process_operation(
+            operation="search",
+            input_path=input_path,
+            output_dir=output_dir,
+            is_batch_mode=is_batch_mode,
+            search_string=search_string,
+        )
+
+    def process_operation(
+        self,
+        *,
+        operation: str,
+        input_path: Optional[str],
+        output_dir: Optional[str] = None,
+        is_batch_mode: bool = False,
+        search_string: str = "",
+        delete_spec: str = "",
+        before_page: Optional[int] = None,
+        after_page: Optional[int] = None,
+    ) -> bool:
+        """Process a workflow for any supported operation.
+
+        operation must be one of: 'search', 'delete', 'before_after'.
         """
+
         if is_batch_mode or input_path is None:
-            # Batch processing mode
-            successful, failed = self.process_batch(search_string, output_dir)
+            successful, failed = self._process_batch_operation(
+                operation=operation,
+                output_dir=output_dir,
+                search_string=search_string,
+                delete_spec=delete_spec,
+                before_page=before_page,
+                after_page=after_page,
+            )
             return failed == 0
-        else:
-            # Single file processing mode
-            return self.process_single_file(input_path, search_string, output_dir or "")
+
+        return self._process_single_operation(
+            operation=operation,
+            input_file=input_path,
+            output_dir=output_dir or "",
+            search_string=search_string,
+            delete_spec=delete_spec,
+            before_page=before_page,
+            after_page=after_page,
+        )
     
     def get_processor_stats(self) -> dict:
         """

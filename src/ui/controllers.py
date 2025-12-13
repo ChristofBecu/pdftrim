@@ -7,7 +7,7 @@ between CLI handling, processing, and output.
 """
 
 import sys
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from ..ui.cli_handler import ParsedArguments
@@ -76,9 +76,9 @@ class ApplicationController(IApplicationController):
         """
         try:
             # Parse and validate command line arguments
-            parsed_args = self._parse_arguments(args)
+            parsed_args, early_exit_code = self._parse_arguments(args)
             if parsed_args is None:
-                return 0  # Help/version was displayed, normal exit
+                return early_exit_code  # help/version (0) or CLI error (non-zero)
             
             # Execute the appropriate workflow
             success = self._execute_workflow(parsed_args)
@@ -97,7 +97,7 @@ class ApplicationController(IApplicationController):
                 self.display.error(f"Traceback: {traceback.format_exc()}")
             return 1
     
-    def _parse_arguments(self, args: Optional[List[str]]) -> Optional['ParsedArguments']:
+    def _parse_arguments(self, args: Optional[List[str]]) -> Tuple[Optional['ParsedArguments'], int]:
         """
         Parse command line arguments using the CLI handler.
         
@@ -105,23 +105,14 @@ class ApplicationController(IApplicationController):
             args: Command line arguments
             
         Returns:
-            Parsed arguments object, or None if help/version was shown
+            (ParsedArguments or None, exit_code)
         """
-        # Import the CLIResult type
-        from .cli_handler import CLIResult
-        
-        # Use the new method that returns a result instead of calling sys.exit()
         result = self.cli_handler.handle_arguments_with_result(args)
         
         if result.should_exit:
-            # For help/version (exit code 0), return None to indicate normal exit
-            # For errors (exit code != 0), raise SystemExit to propagate the error
-            if result.exit_code == 0:
-                return None
-            else:
-                raise SystemExit(result.exit_code)
-        
-        return result.parsed_args
+            return None, result.exit_code
+
+        return result.parsed_args, 0
     
     def _execute_workflow(self, parsed_args) -> bool:
         """
@@ -144,79 +135,21 @@ class ApplicationController(IApplicationController):
             output_dir = getattr(parsed_args, 'output_dir', None)
             is_batch_mode = getattr(parsed_args, 'is_batch_mode', False)
 
-            resolved_output_dir = output_dir or self.config.output_dir
-
-            if operation == 'search':
-                if not search_string.strip():
-                    self.display.error("Search string cannot be empty")
-                    return False
-
-                return self.workflow_manager.process_workflow(
-                    input_path=input_path if not is_batch_mode else None,
-                    search_string=search_string,
-                    output_dir=output_dir,
-                    is_batch_mode=is_batch_mode
-                )
-
-            # Delete operations (Step 2)
-            if is_batch_mode:
-                pdf_files = self.file_manager.find_pdf_files(".")
-                if not pdf_files:
-                    self.display.info("No PDF files found in current directory.")
-                    return True
-
-                successful = 0
-                failed = 0
-
-                for pdf_file in pdf_files:
-                    if operation == 'delete':
-                        result = self.processor.process_pdf_delete_pages(
-                            pdf_file, delete_spec or "", resolved_output_dir
-                        )
-                    else:
-                        result = self.processor.process_pdf_delete_before_after(
-                            pdf_file, before_page, after_page, resolved_output_dir
-                        )
-
-                    if result.success:
-                        successful += 1
-                    else:
-                        failed += 1
-                        self.display.error(f"Failed to process {pdf_file}: {result.message}")
-
-                msg = f"Processing complete: {successful} successful, {failed} failed"
-                if failed == 0:
-                    self.display.success(msg)
-                    return True
-                if successful == 0:
-                    self.display.error(msg)
-                    return False
-                self.display.warning(msg)
+            if operation == 'search' and not search_string.strip():
+                # Defensive guard for programmatic use; CLI already validates.
+                self.display.error("Search string cannot be empty")
                 return False
 
-            # Single file delete ops
-            if input_path is None:
-                self.display.error("Input file is required")
-                return False
-
-            if operation == 'delete':
-                result = self.processor.process_pdf_delete_pages(
-                    input_path, delete_spec or "", resolved_output_dir
-                )
-            else:
-                result = self.processor.process_pdf_delete_before_after(
-                    input_path, before_page, after_page, resolved_output_dir
-                )
-
-            if result.success:
-                self.display.info(f"Result: {result.message}")
-                self.display.info(f"Output: {result.output_file}")
-                self.display.success("Processing complete: 1 successful, 0 failed")
-                return True
-
-            self.display.error(f"Result: {result.message}")
-            self.display.error("Processing complete: 0 successful, 1 failed")
-            return False
+            return self.workflow_manager.process_operation(
+                operation=operation,
+                input_path=input_path if not is_batch_mode else None,
+                output_dir=output_dir,
+                is_batch_mode=is_batch_mode,
+                search_string=search_string,
+                delete_spec=delete_spec or "",
+                before_page=before_page,
+                after_page=after_page,
+            )
             
         except Exception as e:
             self.display.error(f"Workflow execution failed: {e}")
