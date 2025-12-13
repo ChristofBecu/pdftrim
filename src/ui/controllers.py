@@ -17,6 +17,7 @@ from ..di.interfaces import (
     IFileManager, IPDFProcessor, IConfig
 )
 from ..services.workflow_manager import WorkflowManager
+from ..models.operation_request import OperationRequest, OperationType
 
 
 class ApplicationController(IApplicationController):
@@ -135,21 +136,25 @@ class ApplicationController(IApplicationController):
             output_dir = getattr(parsed_args, 'output_dir', None)
             is_batch_mode = getattr(parsed_args, 'is_batch_mode', False)
 
-            if operation == 'search' and not search_string.strip():
-                # Defensive guard for programmatic use; CLI already validates.
-                self.display.error("Search string cannot be empty")
-                return False
-
-            return self.workflow_manager.process_operation(
-                operation=operation,
+            request = OperationRequest(
+                operation=OperationType.from_string(operation),
                 input_path=input_path if not is_batch_mode else None,
-                output_dir=output_dir,
                 is_batch_mode=is_batch_mode,
+                output_dir=output_dir,
                 search_string=search_string,
-                delete_spec=delete_spec or "",
+                delete_spec=(delete_spec or ""),
                 before_page=before_page,
                 after_page=after_page,
             )
+
+            try:
+                request.validate()
+            except ValueError as e:
+                # Defensive guard for programmatic use; CLI already validates.
+                self.display.error(str(e))
+                return False
+
+            return self.workflow_manager.process_request(request)
             
         except Exception as e:
             self.display.error(f"Workflow execution failed: {e}")

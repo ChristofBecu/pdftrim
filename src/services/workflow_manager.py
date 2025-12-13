@@ -12,6 +12,7 @@ import warnings
 from typing import Optional, Tuple
 
 from ..di.interfaces import IDisplayManager, IFileManager, IPDFProcessor, IConfig
+from ..models.operation_request import OperationRequest, OperationType
 
 
 class WorkflowManager:
@@ -64,6 +65,53 @@ class WorkflowManager:
             search_string=search_string,
         )
 
+    def _run_processor(
+        self,
+        *,
+        operation: OperationType,
+        input_file: str,
+        output_dir: str,
+        search_string: str = "",
+        delete_spec: str = "",
+        before_page: Optional[int] = None,
+        after_page: Optional[int] = None,
+    ):
+        if operation == OperationType.SEARCH:
+            return self.processor.process_pdf(input_file, search_string, output_dir)
+        if operation == OperationType.DELETE:
+            return self.processor.process_pdf_delete_pages(input_file, delete_spec, output_dir)
+        if operation == OperationType.BEFORE_AFTER:
+            return self.processor.process_pdf_delete_before_after(
+                input_file,
+                before_page,
+                after_page,
+                output_dir,
+            )
+        raise ValueError(f"Unknown operation: {operation}")
+
+    def _display_operation_details(
+        self,
+        *,
+        operation: OperationType,
+        search_string: str,
+        delete_spec: str,
+        before_page: Optional[int],
+        after_page: Optional[int],
+    ) -> None:
+        if operation == OperationType.SEARCH:
+            self.display.info(f"Search string: '{search_string}'")
+            return
+        if operation == OperationType.DELETE:
+            self.display.info(f"Delete spec: '{delete_spec}'")
+            return
+        if operation == OperationType.BEFORE_AFTER:
+            if before_page is not None:
+                self.display.info(f"Before page: {before_page}")
+            if after_page is not None:
+                self.display.info(f"After page: {after_page}")
+            return
+        raise ValueError(f"Unknown operation: {operation}")
+
     def _process_single_operation(
         self,
         *,
@@ -78,31 +126,26 @@ class WorkflowManager:
         resolved_output_dir = self.file_manager.ensure_output_directory(output_dir or self.config.output_dir)
 
         self.display.info(f"Processing file: {input_file}")
-        if operation == "search":
-            self.display.info(f"Search string: '{search_string}'")
-        elif operation == "delete":
-            self.display.info(f"Delete spec: '{delete_spec}'")
-        elif operation == "before_after":
-            if before_page is not None:
-                self.display.info(f"Before page: {before_page}")
-            if after_page is not None:
-                self.display.info(f"After page: {after_page}")
-        else:
-            raise ValueError(f"Unknown operation: {operation}")
+        op = OperationType.from_string(operation)
+        self._display_operation_details(
+            operation=op,
+            search_string=search_string,
+            delete_spec=delete_spec,
+            before_page=before_page,
+            after_page=after_page,
+        )
 
         self.display.info(f"Output directory: {resolved_output_dir}")
 
-        if operation == "search":
-            result = self.processor.process_pdf(input_file, search_string, resolved_output_dir)
-        elif operation == "delete":
-            result = self.processor.process_pdf_delete_pages(input_file, delete_spec, resolved_output_dir)
-        else:
-            result = self.processor.process_pdf_delete_before_after(
-                input_file,
-                before_page,
-                after_page,
-                resolved_output_dir,
-            )
+        result = self._run_processor(
+            operation=op,
+            input_file=input_file,
+            output_dir=resolved_output_dir,
+            search_string=search_string,
+            delete_spec=delete_spec,
+            before_page=before_page,
+            after_page=after_page,
+        )
 
         if result.success:
             self.display.info(f"Result: {result.message}")
@@ -153,17 +196,14 @@ class WorkflowManager:
             self.display.info(f"  - {os.path.basename(pdf_file)}")
 
         self.display.info(f"Processing {len(pdf_files)} PDF files")
-        if operation == "search":
-            self.display.info(f"Search string: '{search_string}'")
-        elif operation == "delete":
-            self.display.info(f"Delete spec: '{delete_spec}'")
-        elif operation == "before_after":
-            if before_page is not None:
-                self.display.info(f"Before page: {before_page}")
-            if after_page is not None:
-                self.display.info(f"After page: {after_page}")
-        else:
-            raise ValueError(f"Unknown operation: {operation}")
+        op = OperationType.from_string(operation)
+        self._display_operation_details(
+            operation=op,
+            search_string=search_string,
+            delete_spec=delete_spec,
+            before_page=before_page,
+            after_page=after_page,
+        )
 
         self.display.info(f"Output directory: {resolved_output_dir}")
         self.display.info("-" * 50)
@@ -172,17 +212,15 @@ class WorkflowManager:
         failed = 0
 
         for pdf_file in pdf_files:
-            if operation == "search":
-                result = self.processor.process_pdf(pdf_file, search_string, resolved_output_dir)
-            elif operation == "delete":
-                result = self.processor.process_pdf_delete_pages(pdf_file, delete_spec, resolved_output_dir)
-            else:
-                result = self.processor.process_pdf_delete_before_after(
-                    pdf_file,
-                    before_page,
-                    after_page,
-                    resolved_output_dir,
-                )
+            result = self._run_processor(
+                operation=op,
+                input_file=pdf_file,
+                output_dir=resolved_output_dir,
+                search_string=search_string,
+                delete_spec=delete_spec,
+                before_page=before_page,
+                after_page=after_page,
+            )
 
             if result.success:
                 successful += 1
@@ -237,25 +275,43 @@ class WorkflowManager:
         operation must be one of: 'search', 'delete', 'before_after'.
         """
 
-        if is_batch_mode or input_path is None:
-            successful, failed = self._process_batch_operation(
-                operation=operation,
-                output_dir=output_dir,
-                search_string=search_string,
-                delete_spec=delete_spec,
-                before_page=before_page,
-                after_page=after_page,
-            )
-            return failed == 0
-
-        return self._process_single_operation(
-            operation=operation,
-            input_file=input_path,
-            output_dir=output_dir or "",
+        request = OperationRequest(
+            operation=OperationType.from_string(operation),
+            input_path=input_path,
+            is_batch_mode=is_batch_mode or input_path is None,
+            output_dir=output_dir,
             search_string=search_string,
             delete_spec=delete_spec,
             before_page=before_page,
             after_page=after_page,
+        )
+
+        return self.process_request(request)
+
+    def process_request(self, request: OperationRequest) -> bool:
+        """Process a workflow using a typed request object."""
+
+        request.validate()
+
+        if request.is_batch_mode or request.input_path is None:
+            successful, failed = self._process_batch_operation(
+                operation=request.operation.value,
+                output_dir=request.output_dir,
+                search_string=request.search_string,
+                delete_spec=request.delete_spec,
+                before_page=request.before_page,
+                after_page=request.after_page,
+            )
+            return failed == 0
+
+        return self._process_single_operation(
+            operation=request.operation.value,
+            input_file=request.input_path,
+            output_dir=request.output_dir or "",
+            search_string=request.search_string,
+            delete_spec=request.delete_spec,
+            before_page=request.before_page,
+            after_page=request.after_page,
         )
     
     def get_processor_stats(self) -> dict:
