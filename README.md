@@ -35,24 +35,24 @@ pip install "PyMuPDF>=1.24.0,<2.0.0"
 ### Basic Usage
 
 ```bash
-# Process all PDFs in current directory
-python pdftrim.py "search_string"
+# Process all PDFs in current directory (batch mode)
+python pdftrim.py --search "search_string"
 
 # Process a specific PDF file
-python pdftrim.py input.pdf "search_string"
+python pdftrim.py --file input.pdf --search "search_string"
 ```
 
 ### Examples
 
 ```bash
 # Remove pages after "Chapter 5" from all PDFs in directory
-python pdftrim.py "Chapter 5"
+python pdftrim.py -s "Chapter 5"
 
 # Process specific document, remove pages after "Appendix A"
-python pdftrim.py document.pdf "Appendix A"
+python pdftrim.py -f document.pdf -s "Appendix A"
 
 # Process with custom output directory
-PDF_TRIMMER_OUTPUT_DIR=processed python pdftrim.py "References"
+PDF_TRIMMER_OUTPUT_DIR=processed python pdftrim.py -s "References"
 ```
 
 ### Command Line Options

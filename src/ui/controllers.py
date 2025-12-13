@@ -137,23 +137,30 @@ class ApplicationController(IApplicationController):
             # Extract workflow parameters
             input_path = getattr(parsed_args, 'input_path', None)
             search_string = getattr(parsed_args, 'search_string', '')
+            operation = getattr(parsed_args, 'operation', 'search')
             output_dir = getattr(parsed_args, 'output_dir', None)
             is_batch_mode = getattr(parsed_args, 'is_batch_mode', False)
-            
-            # Validate required parameters
+
+            # Step 1 implements parsing; only search trimming workflow exists today.
+            if operation != 'search':
+                self.display.error(
+                    "Requested operation is not implemented yet. "
+                    "Only --search trimming is available in the current release."
+                )
+                return False
+
+            # Validate required parameters for search mode
             if not search_string.strip():
                 self.display.error("Search string cannot be empty")
                 return False
-            
+
             # Execute workflow
-            success = self.workflow_manager.process_workflow(
+            return self.workflow_manager.process_workflow(
                 input_path=input_path if not is_batch_mode else None,
                 search_string=search_string,
                 output_dir=output_dir,
                 is_batch_mode=is_batch_mode
             )
-            
-            return success
             
         except Exception as e:
             self.display.error(f"Workflow execution failed: {e}")
