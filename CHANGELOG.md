@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2025-09-14
 
+## [3.0.0] - 2025-12-14
+
+### Breaking Changes
+
+- **CLI now requires an explicit mode flag** for selection-based operations:
+	- `--search`, `--before`, and `--after` must be used with either `--delete` (delete mode) or `--keep` (keep mode).
+- **`--keep/-k` semantics changed**:
+	- `--keep "SPEC"` keeps only the pages in `SPEC` (inverse of delete-by-spec).
+	- `--keep` (without a spec) inverts `--before/--after` behavior (keeps the pages that would otherwise be deleted).
+	- `--delete` and `--keep` are mutually exclusive.
+- **API signatures extended** to support inversion consistently:
+	- `PDFProcessor.process_pdf(..., invert_selection=False)`
+	- `PDFProcessor.process_pdf_delete_before_after(..., invert_selection=False)`
+
+### Added
+
+- **Keep-mode support across operations**: keep-by-spec, keep-before, keep-after.
+- **Inverted search trimming**: `--keep --search "text"` keeps content starting at the match (inverse trim).
+- **Page selection helper**: `compute_indices_to_delete(...)` for shared delete/keep index calculation.
+- **Result metadata** for inverted operations (`invert_selection`, `keep_spec`, `kept_pages`).
+
+### Changed
+
+- **CLI parsing redesigned**: `--delete/-d` and `--keep/-k` are now the primary mode flags; specs are optional.
+- **Workflow output** now displays "Keep spec" / "Kept pages" when running in keep mode.
+
+### Documentation
+
+- Updated CLI usage and API docs for v3 behavior.
+
 ### Major Refactoring Release
 
 This release represents a comprehensive refactoring and cleanup of the codebase, focusing on removing over-engineered features, improving maintainability, and enhancing code quality.

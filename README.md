@@ -228,7 +228,7 @@ pip install pytest pytest-cov
 
 ## License
 
-[Add your license information here]
+MIT License. See [LICENSE](LICENSE).
 
 ## Changelog
 

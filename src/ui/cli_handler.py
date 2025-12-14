@@ -109,7 +109,7 @@ class CLIHandler(ICLIHandler):
     # Application metadata
     APP_NAME = "PDF Trimmer"
     APP_DESCRIPTION = "Removes pages from a PDF starting at a specific search string."
-    VERSION = "2.1.0"
+    VERSION = "3.0.0"
     
     # Error messages
     ERROR_EMPTY_SEARCH = "Search string cannot be empty"
