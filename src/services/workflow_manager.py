@@ -150,6 +150,22 @@ class WorkflowManager:
         if result.success:
             self.display.info(f"Result: {result.message}")
             self.display.info(f"Output: {result.output_file}")
+
+            if op in (OperationType.DELETE, OperationType.BEFORE_AFTER):
+                deleted_pages = getattr(result, "deleted_pages", None) or []
+                if deleted_pages:
+                    max_pages = 20
+                    shown = deleted_pages[:max_pages]
+                    suffix = "" if len(deleted_pages) <= max_pages else f" … (+{len(deleted_pages) - max_pages} more)"
+                    self.display.info(f"Deleted pages: {', '.join(map(str, shown))}{suffix}")
+
+            if op == OperationType.SEARCH:
+                search_found = getattr(result, "search_found", None)
+                if search_found is False:
+                    self.display.info("Search string not found: no trim performed")
+                elif search_found is True and getattr(result, "trim_page", None):
+                    self.display.info(f"Trimmed at page: {result.trim_page}")
+
             self.display.success("Processing complete: 1 successful, 0 failed")
             return True
 
@@ -211,6 +227,11 @@ class WorkflowManager:
         successful = 0
         failed = 0
 
+        total_blank_pages_removed = 0
+        total_pages_deleted = 0
+        files_trimmed = 0
+        files_no_trim_needed = 0
+
         for pdf_file in pdf_files:
             result = self._run_processor(
                 operation=op,
@@ -224,12 +245,38 @@ class WorkflowManager:
 
             if result.success:
                 successful += 1
+
+                total_blank_pages_removed += int(getattr(result, "blank_pages_removed", 0) or 0)
+
+                if op in (OperationType.DELETE, OperationType.BEFORE_AFTER):
+                    total_pages_deleted += int(getattr(result, "pages_deleted", 0) or 0)
+                elif op == OperationType.SEARCH:
+                    search_found = getattr(result, "search_found", None)
+                    if search_found is True:
+                        files_trimmed += 1
+                    elif search_found is False:
+                        files_no_trim_needed += 1
+                    else:
+                        # Backwards compatibility: infer from legacy fields.
+                        if getattr(result, "pages_trimmed", False):
+                            files_trimmed += 1
+                        else:
+                            files_no_trim_needed += 1
             else:
                 failed += 1
                 self.display.error(f"Failed to process {pdf_file}: {result.message}")
 
         self.display.info("-" * 50)
+
         message = f"Processing complete: {successful} successful, {failed} failed"
+        if op in (OperationType.DELETE, OperationType.BEFORE_AFTER):
+            message += f" (pages deleted: {total_pages_deleted}, blank pages removed: {total_blank_pages_removed})"
+        elif op == OperationType.SEARCH:
+            message += (
+                f" (trimmed: {files_trimmed}, no trim needed: {files_no_trim_needed}, "
+                f"blank pages removed: {total_blank_pages_removed})"
+            )
+
         if failed == 0:
             self.display.success(message)
         elif successful == 0:

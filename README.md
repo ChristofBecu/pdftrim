@@ -1,6 +1,6 @@
 # PDF Trimmer
 
-A Python utility for trimming PDF documents based on text search patterns. Removes pages after a specified search string and automatically detects and removes blank pages.
+A Python utility for trimming and editing PDF documents via a text search cutoff or explicit page deletion (ranges, before/after), with batch processing and automatic blank-page removal.
 
 ## Features
 
@@ -33,14 +33,20 @@ pip install "PyMuPDF>=1.24.0,<2.0.0"
 
 ## Usage
 
+You can run via `python pdftrim.py ...`, or use the wrapper script `./pdftrim.sh ...` to automatically use the local virtualenv at `.venv`.
+
 ### Basic Usage
 
 ```bash
 # Process all PDFs in current directory (batch mode)
 python pdftrim.py --search "search_string"
+# or:
+./pdftrim.sh --search "search_string"
 
 # Process a specific PDF file
 python pdftrim.py --file input.pdf --search "search_string"
+# or:
+./pdftrim.sh --file input.pdf --search "search_string"
 
 # Delete specific pages (1-based)
 python pdftrim.py --file input.pdf --delete "1-4,7"
@@ -85,6 +91,11 @@ python pdftrim.py -f document.pdf -a 10
 
 ### Command Line Options
 
+- `-f`, `--file`: Input PDF file path (omit for batch mode in current directory)
+- `-s`, `--search`: Trim from first occurrence of this search string
+- `-d`, `--delete`: Delete pages/ranges (e.g. `1-4,7`)
+- `-b`, `--before`: Delete pages before this page number (e.g. `10` deletes `1-9`)
+- `-a`, `--after`: Delete pages after this page number (e.g. `10` deletes `11-end`)
 - `--help`, `-h`: Show help message
 - `--version`, `-v`: Show version information
 

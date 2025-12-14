@@ -22,7 +22,11 @@ class ProcessingResult:
                  blank_pages_removed: int = 0, trim_page: Optional[int] = None,
                  operation: str = "search",
                  pages_deleted: int = 0,
-                 deleted_pages: Optional[list[int]] = None):
+                 deleted_pages: Optional[list[int]] = None,
+                 search_found: Optional[bool] = None,
+                 delete_spec: Optional[str] = None,
+                 before_page: Optional[int] = None,
+                 after_page: Optional[int] = None):
         self.success = success
         self.input_file = input_file
         self.output_file = output_file
@@ -33,6 +37,10 @@ class ProcessingResult:
         self.operation = operation
         self.pages_deleted = pages_deleted
         self.deleted_pages = deleted_pages
+        self.search_found = search_found
+        self.delete_spec = delete_spec
+        self.before_page = before_page
+        self.after_page = after_page
     
     def __str__(self) -> str:
         """String representation for easy display."""

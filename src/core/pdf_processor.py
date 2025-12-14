@@ -141,6 +141,7 @@ class PDFProcessor(IPDFProcessor):
                 operation="delete",
                 pages_deleted=len(deleted_pages_1_based),
                 deleted_pages=deleted_pages_1_based,
+                delete_spec=delete_spec,
             )
 
         except (FileValidationError, PageSpecError) as e:
@@ -149,6 +150,7 @@ class PDFProcessor(IPDFProcessor):
                 input_file=str(input_file),
                 message=str(e),
                 operation="delete",
+                delete_spec=delete_spec,
             )
         except Exception as e:
             return ProcessingResult(
@@ -156,6 +158,7 @@ class PDFProcessor(IPDFProcessor):
                 input_file=str(input_file),
                 message=str(e),
                 operation="delete",
+                delete_spec=delete_spec,
             )
 
     def process_pdf_delete_before_after(self, input_file: Union[str, Path],
@@ -212,6 +215,8 @@ class PDFProcessor(IPDFProcessor):
                 operation="before_after",
                 pages_deleted=len(deleted_pages_1_based),
                 deleted_pages=deleted_pages_1_based,
+                before_page=before_page,
+                after_page=after_page,
             )
 
         except (FileValidationError, PageSpecError) as e:
@@ -220,6 +225,8 @@ class PDFProcessor(IPDFProcessor):
                 input_file=str(input_file),
                 message=str(e),
                 operation="before_after",
+                before_page=before_page,
+                after_page=after_page,
             )
         except Exception as e:
             return ProcessingResult(
@@ -227,6 +234,8 @@ class PDFProcessor(IPDFProcessor):
                 input_file=str(input_file),
                 message=str(e),
                 operation="before_after",
+                before_page=before_page,
+                after_page=after_page,
             )
     
     def _process_without_trimming(self, input_file: str, output_file: str) -> ProcessingResult:
@@ -257,7 +266,9 @@ class PDFProcessor(IPDFProcessor):
             output_file=output_file,
             message=message,
             pages_trimmed=False,
-            blank_pages_removed=blank_pages_removed
+            blank_pages_removed=blank_pages_removed,
+            operation="search",
+            search_found=False,
         )
     
     def _process_with_trimming(self, input_file: str, output_file: str, 
@@ -287,7 +298,9 @@ class PDFProcessor(IPDFProcessor):
             message=message,
             pages_trimmed=True,
             blank_pages_removed=blank_pages_removed,
-            trim_page=page_num + 1  # 1-indexed for user display
+            trim_page=page_num + 1,  # 1-indexed for user display
+            operation="search",
+            search_found=True,
         )
     
     def _trim_page_content(self, input_file: str, output_file: str, 
