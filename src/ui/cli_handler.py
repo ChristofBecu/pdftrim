@@ -15,6 +15,10 @@ from .display import DisplayManager
 from ..di.interfaces import ICLIHandler
 
 
+_KEEP_FLAG = "__KEEP_FLAG__"
+_DELETE_FLAG = "__DELETE_FLAG__"
+
+
 class CLIError(Exception):
     """Raised when command line interface encounters an error."""
     pass
@@ -49,6 +53,7 @@ class ParsedArguments:
     operation: str
     search_string: str = ""
     delete_spec: Optional[str] = None
+    invert_selection: bool = False
     before_page: Optional[int] = None
     after_page: Optional[int] = None
     output_dir: Optional[str] = None
@@ -62,6 +67,8 @@ class ParsedArguments:
                 raise CLIError("Search string cannot be empty")
         elif op == "delete":
             if not (self.delete_spec or "").strip():
+                if self.invert_selection:
+                    raise CLIError("Keep specification cannot be empty")
                 raise CLIError("Delete specification cannot be empty")
         elif op == "before_after":
             if self.before_page is None and self.after_page is None:
@@ -145,7 +152,24 @@ class CLIHandler(ICLIHandler):
             "-d",
             "--delete",
             dest="delete",
-            help="Delete specific pages/ranges (e.g. 1-4,7).",
+            nargs="?",
+            const=_DELETE_FLAG,
+            help=(
+                "Delete mode. With a spec, delete pages/ranges (e.g. 1-4,7). "
+                "Without a spec, used with --search/--before/--after."
+            ),
+        )
+
+        parser.add_argument(
+            "-k",
+            "--keep",
+            dest="keep",
+            nargs="?",
+            const=_KEEP_FLAG,
+            help=(
+                "Invert selection logic. With a spec, keep only those pages (e.g. 1-4,7). "
+                "Without a spec, reverses --delete/--before/--after behavior."
+            ),
         )
 
         parser.add_argument(
@@ -212,23 +236,42 @@ class CLIHandler(ICLIHandler):
         # (e.g. "Search string cannot be empty") instead of "no operation".
         has_search = namespace.search is not None
         has_delete = namespace.delete is not None
+        has_keep = namespace.keep is not None
+        delete_has_spec = has_delete and namespace.delete != _DELETE_FLAG
+        keep_has_spec = has_keep and namespace.keep != _KEEP_FLAG
         has_before = namespace.before is not None
         has_after = namespace.after is not None
 
-        if has_search and (has_delete or has_before or has_after):
-            raise CLIError("--search cannot be combined with --delete/--before/--after")
-        if has_delete and (has_search or has_before or has_after):
-            raise CLIError("--delete cannot be combined with --search/--before/--after")
+        if has_delete and has_keep:
+            raise CLIError("--delete and --keep cannot be combined")
 
-        if not (has_search or has_delete or has_before or has_after):
-            raise CLIError("You must specify one operation: --search, --delete, --before, or --after")
+        # Require explicit delete/keep mode for any operation.
+        if (has_search or has_before or has_after) and not (has_delete or has_keep):
+            raise CLIError("You must specify one mode flag: --delete or --keep")
+
+        # Operations are mutually exclusive: search vs before/after vs spec-based delete/keep.
+        if has_search and (has_before or has_after or delete_has_spec or keep_has_spec):
+            raise CLIError("--search cannot be combined with --before/--after or a page spec")
+        if (has_before or has_after) and (delete_has_spec or keep_has_spec):
+            raise CLIError("--before/--after cannot be combined with a page spec")
+
+        if not (has_search or has_delete or has_keep or has_before or has_after):
+            raise CLIError("You must specify one operation: --search, --delete, --keep, --before, or --after")
+
+        # A bare mode flag without an actual operation is not meaningful.
+        if (has_delete or has_keep) and not (has_search or has_before or has_after or delete_has_spec or keep_has_spec):
+            raise CLIError("Mode flag requires an operation: --search, --before/--after, or a page spec")
 
         if has_search:
             operation = "search"
-        elif has_delete:
+        elif delete_has_spec or keep_has_spec:
             operation = "delete"
-        else:
+        elif has_before or has_after:
             operation = "before_after"
+        else:
+            # This is effectively "--keep" with no other operation, handled above,
+            # or an impossible state.
+            raise CLIError("Invalid operation")
 
         # Batch mode behavior: if -f/--file is omitted, process current directory.
         if namespace.file:
@@ -238,12 +281,15 @@ class CLIHandler(ICLIHandler):
             input_path = "."
             is_batch_mode = True
 
+        delete_or_keep_spec = namespace.delete if delete_has_spec else (namespace.keep if keep_has_spec else None)
+
         return ParsedArguments(
             input_path=input_path,
             is_batch_mode=is_batch_mode,
             operation=operation,
             search_string=namespace.search or "",
-            delete_spec=namespace.delete,
+            delete_spec=delete_or_keep_spec,
+            invert_selection=has_keep,
             before_page=namespace.before,
             after_page=namespace.after,
         )

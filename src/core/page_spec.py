@@ -27,6 +27,38 @@ class DeleteSpecResult:
         return sorted([i + 1 for i in self.indices_0_based_desc])
 
 
+def compute_indices_to_delete(
+        spec: str,
+        *,
+        page_count: int,
+        invert_selection: bool = False,
+) -> tuple[list[int], list[int] | None]:
+        """Compute 0-based deletion indices from a delete or keep specification.
+
+        When invert_selection is False:
+            - spec is a delete specification
+            - returns (indices_to_delete_desc, None)
+
+        When invert_selection is True:
+            - spec is a keep specification (keep only those pages)
+            - returns (indices_to_delete_desc, keep_indices_desc)
+
+        Both outputs are sorted descending for safe deletion.
+        """
+
+        parsed = parse_delete_spec(spec, page_count=page_count)
+
+        if not invert_selection:
+                return parsed.indices_0_based_desc, None
+
+        keep_indices_desc = parsed.indices_0_based_desc
+        keep_set = set(keep_indices_desc)
+
+        # Descending, safe-to-delete order.
+        indices_to_delete_desc = [i for i in range(page_count - 1, -1, -1) if i not in keep_set]
+        return indices_to_delete_desc, keep_indices_desc
+
+
 def _require_page_count(page_count: int) -> None:
     if page_count < 0:
         raise PageSpecError("page_count must be >= 0")

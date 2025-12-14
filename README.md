@@ -39,63 +39,77 @@ You can run via `python pdftrim.py ...`, or use the wrapper script `./pdftrim.sh
 
 ```bash
 # Process all PDFs in current directory (batch mode)
-python pdftrim.py --search "search_string"
+python pdftrim.py --delete --search "search_string"
 # or:
-./pdftrim.sh --search "search_string"
+./pdftrim.sh --delete --search "search_string"
 
 # Process a specific PDF file
-python pdftrim.py --file input.pdf --search "search_string"
+python pdftrim.py --file input.pdf --delete --search "search_string"
 # or:
-./pdftrim.sh --file input.pdf --search "search_string"
+./pdftrim.sh --file input.pdf --delete --search "search_string"
 
 # Delete specific pages (1-based)
 python pdftrim.py --file input.pdf --delete "1-4,7"
 
+# Keep only specific pages (1-based) - inverse of delete-by-spec
+python pdftrim.py --file input.pdf --keep "1-4,7"
+
+# Invert before/after behavior (keep instead of delete)
+python pdftrim.py --file input.pdf --keep --before 10   # keeps pages 1-9
+
 # Delete pages before a page number (1-based)
-python pdftrim.py --file input.pdf --before 10   # deletes pages 1-9
+python pdftrim.py --file input.pdf --delete --before 10   # deletes pages 1-9
 
 # Delete pages after a page number (1-based)
-python pdftrim.py --file input.pdf --after 10    # deletes pages 11-end
+python pdftrim.py --file input.pdf --delete --after 10    # deletes pages 11-end
 
 # Combine before + after (allowed)
-python pdftrim.py --file input.pdf --before 10 --after 12
+python pdftrim.py --file input.pdf --delete --before 10 --after 12
+
+# Invert text-based trimming (keep content starting at the match)
+python pdftrim.py --file input.pdf --keep --search "search_string"
 ```
 
 ### Examples
 
 ```bash
 # Remove pages after "Chapter 5" from all PDFs in directory
-python pdftrim.py -s "Chapter 5"
+python pdftrim.py -d -s "Chapter 5"
 
 # Process specific document, remove pages after "Appendix A"
-python pdftrim.py -f document.pdf -s "Appendix A"
+python pdftrim.py -f document.pdf -d -s "Appendix A"
 
 # Process with custom output directory
-PDF_TRIMMER_OUTPUT_DIR=processed python pdftrim.py -s "References"
+PDF_TRIMMER_OUTPUT_DIR=processed python pdftrim.py -d -s "References"
 
 # Delete pages 1-4 and 7
 python pdftrim.py -f document.pdf -d "1-4,7"
 
+# Keep only pages 1-4 and 7
+python pdftrim.py -f document.pdf -k "1-4,7"
+
 # Remove everything before page 10
-python pdftrim.py -f document.pdf -b 10
+python pdftrim.py -f document.pdf -d -b 10
 
 # Remove everything after page 10
-python pdftrim.py -f document.pdf -a 10
+python pdftrim.py -f document.pdf -d -a 10
 ```
 
 ### Notes
 
-- Page numbers are **1-based** for all page deletion flags.
+- Page numbers are **1-based** for all page deletion flags (including `--keep`).
+- For `--search`, `--before`, and `--after`, you must specify a mode flag: `--delete` or `--keep`.
 - `--before` and `--after` can be combined; other operations are mutually exclusive.
 - The tool refuses to create an empty PDF (if an operation would delete all pages).
 
 ### Command Line Options
 
 - `-f`, `--file`: Input PDF file path (omit for batch mode in current directory)
-- `-s`, `--search`: Trim from first occurrence of this search string
-- `-d`, `--delete`: Delete pages/ranges (e.g. `1-4,7`)
-- `-b`, `--before`: Delete pages before this page number (e.g. `10` deletes `1-9`)
-- `-a`, `--after`: Delete pages after this page number (e.g. `10` deletes `11-end`)
+- `-s`, `--search`: Trim based on the first occurrence of this search string (requires `--delete` or `--keep`)
+- `-d`, `--delete`: Delete mode; with a spec deletes pages/ranges (e.g. `1-4,7`)
+- `-k`, `--keep`: Keep mode; with a spec keeps pages/ranges (e.g. `1-4,7`)
+- `-b`, `--before`: Before-page selection (requires `--delete` or `--keep`)
+- `-a`, `--after`: After-page selection (requires `--delete` or `--keep`)
 - `--help`, `-h`: Show help message
 - `--version`, `-v`: Show version information
 

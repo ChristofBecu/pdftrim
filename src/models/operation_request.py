@@ -30,6 +30,7 @@ class OperationRequest:
 
     search_string: str = ""
     delete_spec: str = ""
+    invert_selection: bool = False
     before_page: Optional[int] = None
     after_page: Optional[int] = None
 
@@ -39,6 +40,8 @@ class OperationRequest:
                 raise ValueError("Search string cannot be empty")
         elif self.operation == OperationType.DELETE:
             if not self.delete_spec.strip():
+                if self.invert_selection:
+                    raise ValueError("Keep specification cannot be empty")
                 raise ValueError("Delete specification cannot be empty")
         elif self.operation == OperationType.BEFORE_AFTER:
             if self.before_page is None and self.after_page is None:

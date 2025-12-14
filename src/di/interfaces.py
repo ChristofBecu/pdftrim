@@ -82,13 +82,15 @@ class IPDFProcessor(ABC):
     
     @abstractmethod
     def process_pdf(self, input_file: Union[str, Path], search_string: str, 
-                   output_dir: Union[str, Path]) -> 'ProcessingResult':
+                   output_dir: Union[str, Path],
+                   invert_selection: bool = False) -> 'ProcessingResult':
         """Process a PDF file with trimming based on search string."""
         pass
 
     @abstractmethod
     def process_pdf_delete_pages(self, input_file: Union[str, Path], delete_spec: str,
-                                output_dir: Union[str, Path]) -> 'ProcessingResult':
+                                output_dir: Union[str, Path],
+                                invert_selection: bool = False) -> 'ProcessingResult':
         """Delete specific pages/ranges from a PDF."""
         pass
 
@@ -96,7 +98,8 @@ class IPDFProcessor(ABC):
     def process_pdf_delete_before_after(self, input_file: Union[str, Path],
                                        before_page: Optional[int],
                                        after_page: Optional[int],
-                                       output_dir: Union[str, Path]) -> 'ProcessingResult':
+                                       output_dir: Union[str, Path],
+                                       invert_selection: bool = False) -> 'ProcessingResult':
         """Delete pages before/after a 1-based page number."""
         pass
     

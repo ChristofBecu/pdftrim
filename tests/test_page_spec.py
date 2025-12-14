@@ -3,6 +3,7 @@ import pytest
 from src.core.page_spec import (
     PageSpecError,
     parse_delete_spec,
+    compute_indices_to_delete,
     indices_before_page,
     indices_after_page,
 )
@@ -12,6 +13,25 @@ def test_parse_delete_spec_dedupes_and_sorts_desc() -> None:
     result = parse_delete_spec("1-3,2", page_count=5)
     assert result.indices_0_based_desc == [2, 1, 0]
     assert result.as_1_based_sorted() == [1, 2, 3]
+
+
+def test_compute_indices_to_delete_delete_mode_matches_parse() -> None:
+    indices, kept = compute_indices_to_delete("1-3,2", page_count=5, invert_selection=False)
+    assert indices == [2, 1, 0]
+    assert kept is None
+
+
+def test_compute_indices_to_delete_keep_mode_complements() -> None:
+    # Keep pages 2-3 in a 5-page document => delete 1,4,5
+    indices, kept = compute_indices_to_delete("2-3", page_count=5, invert_selection=True)
+    assert indices == [4, 3, 0]
+    assert kept == [2, 1]
+
+
+def test_compute_indices_to_delete_keep_all_deletes_none() -> None:
+    indices, kept = compute_indices_to_delete("1-5", page_count=5, invert_selection=True)
+    assert indices == []
+    assert kept == [4, 3, 2, 1, 0]
 
 
 @pytest.mark.parametrize(

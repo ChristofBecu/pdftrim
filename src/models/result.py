@@ -25,6 +25,9 @@ class ProcessingResult:
                  deleted_pages: Optional[list[int]] = None,
                  search_found: Optional[bool] = None,
                  delete_spec: Optional[str] = None,
+                 invert_selection: bool = False,
+                 keep_spec: Optional[str] = None,
+                 kept_pages: Optional[list[int]] = None,
                  before_page: Optional[int] = None,
                  after_page: Optional[int] = None):
         self.success = success
@@ -39,6 +42,9 @@ class ProcessingResult:
         self.deleted_pages = deleted_pages
         self.search_found = search_found
         self.delete_spec = delete_spec
+        self.invert_selection = invert_selection
+        self.keep_spec = keep_spec
+        self.kept_pages = kept_pages
         self.before_page = before_page
         self.after_page = after_page
     

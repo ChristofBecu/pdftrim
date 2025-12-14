@@ -73,19 +73,31 @@ class WorkflowManager:
         output_dir: str,
         search_string: str = "",
         delete_spec: str = "",
+        invert_selection: bool = False,
         before_page: Optional[int] = None,
         after_page: Optional[int] = None,
     ):
         if operation == OperationType.SEARCH:
-            return self.processor.process_pdf(input_file, search_string, output_dir)
+            return self.processor.process_pdf(
+                input_file,
+                search_string,
+                output_dir,
+                invert_selection=invert_selection,
+            )
         if operation == OperationType.DELETE:
-            return self.processor.process_pdf_delete_pages(input_file, delete_spec, output_dir)
+            return self.processor.process_pdf_delete_pages(
+                input_file,
+                delete_spec,
+                output_dir,
+                invert_selection=invert_selection,
+            )
         if operation == OperationType.BEFORE_AFTER:
             return self.processor.process_pdf_delete_before_after(
                 input_file,
                 before_page,
                 after_page,
                 output_dir,
+                invert_selection=invert_selection,
             )
         raise ValueError(f"Unknown operation: {operation}")
 
@@ -95,6 +107,7 @@ class WorkflowManager:
         operation: OperationType,
         search_string: str,
         delete_spec: str,
+        invert_selection: bool,
         before_page: Optional[int],
         after_page: Optional[int],
     ) -> None:
@@ -102,13 +115,22 @@ class WorkflowManager:
             self.display.info(f"Search string: '{search_string}'")
             return
         if operation == OperationType.DELETE:
-            self.display.info(f"Delete spec: '{delete_spec}'")
+            if invert_selection:
+                self.display.info(f"Keep spec: '{delete_spec}'")
+            else:
+                self.display.info(f"Delete spec: '{delete_spec}'")
             return
         if operation == OperationType.BEFORE_AFTER:
-            if before_page is not None:
-                self.display.info(f"Before page: {before_page}")
-            if after_page is not None:
-                self.display.info(f"After page: {after_page}")
+            if invert_selection:
+                if before_page is not None:
+                    self.display.info(f"Keep pages before page: {before_page}")
+                if after_page is not None:
+                    self.display.info(f"Keep pages after page: {after_page}")
+            else:
+                if before_page is not None:
+                    self.display.info(f"Before page: {before_page}")
+                if after_page is not None:
+                    self.display.info(f"After page: {after_page}")
             return
         raise ValueError(f"Unknown operation: {operation}")
 
@@ -120,6 +142,7 @@ class WorkflowManager:
         output_dir: str,
         search_string: str = "",
         delete_spec: str = "",
+        invert_selection: bool = False,
         before_page: Optional[int] = None,
         after_page: Optional[int] = None,
     ) -> bool:
@@ -131,6 +154,7 @@ class WorkflowManager:
             operation=op,
             search_string=search_string,
             delete_spec=delete_spec,
+            invert_selection=invert_selection,
             before_page=before_page,
             after_page=after_page,
         )
@@ -143,6 +167,7 @@ class WorkflowManager:
             output_dir=resolved_output_dir,
             search_string=search_string,
             delete_spec=delete_spec,
+            invert_selection=invert_selection,
             before_page=before_page,
             after_page=after_page,
         )
@@ -152,12 +177,20 @@ class WorkflowManager:
             self.display.info(f"Output: {result.output_file}")
 
             if op in (OperationType.DELETE, OperationType.BEFORE_AFTER):
-                deleted_pages = getattr(result, "deleted_pages", None) or []
-                if deleted_pages:
-                    max_pages = 20
-                    shown = deleted_pages[:max_pages]
-                    suffix = "" if len(deleted_pages) <= max_pages else f" … (+{len(deleted_pages) - max_pages} more)"
-                    self.display.info(f"Deleted pages: {', '.join(map(str, shown))}{suffix}")
+                if op == OperationType.DELETE and invert_selection:
+                    kept_pages = getattr(result, "kept_pages", None) or []
+                    if kept_pages:
+                        max_pages = 20
+                        shown = kept_pages[:max_pages]
+                        suffix = "" if len(kept_pages) <= max_pages else f" … (+{len(kept_pages) - max_pages} more)"
+                        self.display.info(f"Kept pages: {', '.join(map(str, shown))}{suffix}")
+                else:
+                    deleted_pages = getattr(result, "deleted_pages", None) or []
+                    if deleted_pages:
+                        max_pages = 20
+                        shown = deleted_pages[:max_pages]
+                        suffix = "" if len(deleted_pages) <= max_pages else f" … (+{len(deleted_pages) - max_pages} more)"
+                        self.display.info(f"Deleted pages: {', '.join(map(str, shown))}{suffix}")
 
             if op == OperationType.SEARCH:
                 search_found = getattr(result, "search_found", None)
@@ -196,6 +229,7 @@ class WorkflowManager:
         output_dir: Optional[str] = None,
         search_string: str = "",
         delete_spec: str = "",
+        invert_selection: bool = False,
         before_page: Optional[int] = None,
         after_page: Optional[int] = None,
     ) -> Tuple[int, int]:
@@ -217,6 +251,7 @@ class WorkflowManager:
             operation=op,
             search_string=search_string,
             delete_spec=delete_spec,
+            invert_selection=invert_selection,
             before_page=before_page,
             after_page=after_page,
         )
@@ -239,6 +274,7 @@ class WorkflowManager:
                 output_dir=resolved_output_dir,
                 search_string=search_string,
                 delete_spec=delete_spec,
+                invert_selection=invert_selection,
                 before_page=before_page,
                 after_page=after_page,
             )
@@ -314,6 +350,7 @@ class WorkflowManager:
         is_batch_mode: bool = False,
         search_string: str = "",
         delete_spec: str = "",
+        invert_selection: bool = False,
         before_page: Optional[int] = None,
         after_page: Optional[int] = None,
     ) -> bool:
@@ -329,6 +366,7 @@ class WorkflowManager:
             output_dir=output_dir,
             search_string=search_string,
             delete_spec=delete_spec,
+            invert_selection=invert_selection,
             before_page=before_page,
             after_page=after_page,
         )
@@ -346,6 +384,7 @@ class WorkflowManager:
                 output_dir=request.output_dir,
                 search_string=request.search_string,
                 delete_spec=request.delete_spec,
+                invert_selection=request.invert_selection,
                 before_page=request.before_page,
                 after_page=request.after_page,
             )
@@ -357,6 +396,7 @@ class WorkflowManager:
             output_dir=request.output_dir or "",
             search_string=request.search_string,
             delete_spec=request.delete_spec,
+            invert_selection=request.invert_selection,
             before_page=request.before_page,
             after_page=request.after_page,
         )

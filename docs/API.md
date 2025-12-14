@@ -16,7 +16,8 @@ processor = PDFProcessor(debug=False, display_manager=display_manager)
 result = processor.process_pdf(
     input_file="document.pdf",
     search_string="Chapter 5", 
-    output_dir="output"
+    output_dir="output",
+    invert_selection=False,
 )
 
 # Delete explicit pages/ranges
@@ -26,6 +27,14 @@ result = processor.process_pdf_delete_pages(
     output_dir="output",
 )
 
+# Keep only explicit pages/ranges (inverse of delete)
+result = processor.process_pdf_delete_pages(
+    input_file="document.pdf",
+    delete_spec="1-4,7",
+    output_dir="output",
+    invert_selection=True,
+)
+
 # Delete before/after a page number (1-based)
 result = processor.process_pdf_delete_before_after(
     input_file="document.pdf",
@@ -33,17 +42,29 @@ result = processor.process_pdf_delete_before_after(
     after_page=None,
     output_dir="output",
 )
+
+# Invert before/after (keep pages before/after, delete the rest)
+result = processor.process_pdf_delete_before_after(
+    input_file="document.pdf",
+    before_page=10,   # keeps pages 1-9
+    after_page=None,
+    output_dir="output",
+    invert_selection=True,
+)
 ```
 
 #### PDFProcessor Methods
 
-- `process_pdf(input_file, search_string, output_dir) -> ProcessingResult`
-  - Process a PDF file with trimming based on search string
-  - Returns processing result with success status and output path
-- `process_pdf_delete_pages(input_file, delete_spec, output_dir) -> ProcessingResult`
+- `process_pdf(input_file, search_string, output_dir, invert_selection=False) -> ProcessingResult`
+    - Process a PDF file with trimming based on search string
+    - Returns processing result with success status and output path
+    - If `invert_selection=True`, keeps content starting at the match location (inverse trim)
+- `process_pdf_delete_pages(input_file, delete_spec, output_dir, invert_selection=False) -> ProcessingResult`
     - Delete specific pages/ranges from a PDF (1-based spec like `"1-4,7"`)
-- `process_pdf_delete_before_after(input_file, before_page, after_page, output_dir) -> ProcessingResult`
+    - If `invert_selection=True`, treat `delete_spec` as a keep spec and delete all other pages
+- `process_pdf_delete_before_after(input_file, before_page, after_page, output_dir, invert_selection=False) -> ProcessingResult`
     - Delete pages before/after a 1-based page number (before and after may be combined)
+    - If `invert_selection=True`, keep the pages that would otherwise be deleted and delete the rest
 
 ### TextSearchEngine
 
@@ -173,6 +194,11 @@ Delete fields:
 - `pages_deleted: int`: Number of pages deleted
 - `deleted_pages: Optional[list[int]]`: 1-based deleted pages (sorted)
 - `delete_spec: Optional[str]`: Echo of the delete specification for delete-by-spec
+
+Keep (inverted delete) fields:
+- `invert_selection: bool`: True when `delete_spec` was treated as a keep spec
+- `keep_spec: Optional[str]`: Echo of the keep specification
+- `kept_pages: Optional[list[int]]`: 1-based kept pages (sorted)
 - `before_page: Optional[int]`, `after_page: Optional[int]`: Echo of before/after inputs
 
 ### ParsedArguments
@@ -197,6 +223,7 @@ args = ParsedArguments(
 - `operation: str`: One of `"search"`, `"delete"`, `"before_after"`
 - `search_string: str`: Text to search for (search operation)
 - `delete_spec: Optional[str]`: Page/range deletion spec (delete operation)
+- `invert_selection: bool`: True when `--keep` was used (treat delete_spec as keep spec)
 - `before_page: Optional[int]`, `after_page: Optional[int]`: Before/after delete page numbers
 
 ### PDFDocument

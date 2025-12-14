@@ -131,6 +131,7 @@ class ApplicationController(IApplicationController):
             search_string = getattr(parsed_args, 'search_string', '')
             operation = getattr(parsed_args, 'operation', 'search')
             delete_spec = getattr(parsed_args, 'delete_spec', None)
+            invert_selection = getattr(parsed_args, 'invert_selection', False)
             before_page = getattr(parsed_args, 'before_page', None)
             after_page = getattr(parsed_args, 'after_page', None)
             output_dir = getattr(parsed_args, 'output_dir', None)
@@ -143,6 +144,7 @@ class ApplicationController(IApplicationController):
                 output_dir=output_dir,
                 search_string=search_string,
                 delete_spec=(delete_spec or ""),
+                invert_selection=bool(invert_selection),
                 before_page=before_page,
                 after_page=after_page,
             )
