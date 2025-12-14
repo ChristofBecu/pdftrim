@@ -28,3 +28,5 @@ Usage:
     controller = container.resolve(IApplicationController)
     exit_code = controller.run(sys.argv[1:])
 """
+
+__version__ = "2.1.0"

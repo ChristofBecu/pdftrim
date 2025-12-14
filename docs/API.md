@@ -11,26 +11,60 @@ The main class responsible for PDF processing and trimming operations.
 ```python
 from src.core.pdf_processor import PDFProcessor
 
-processor = PDFProcessor(
-    search_engine=text_search_engine,
-    file_manager=file_manager,
-    display_manager=display_manager,
-    config=config,
-    debug=False
-)
+processor = PDFProcessor(debug=False, display_manager=display_manager)
 
 result = processor.process_pdf(
     input_file="document.pdf",
     search_string="Chapter 5", 
-    output_dir="output"
+    output_dir="output",
+    invert_selection=False,
+)
+
+# Delete explicit pages/ranges
+result = processor.process_pdf_delete_pages(
+    input_file="document.pdf",
+    delete_spec="1-4,7",
+    output_dir="output",
+)
+
+# Keep only explicit pages/ranges (inverse of delete)
+result = processor.process_pdf_delete_pages(
+    input_file="document.pdf",
+    delete_spec="1-4,7",
+    output_dir="output",
+    invert_selection=True,
+)
+
+# Delete before/after a page number (1-based)
+result = processor.process_pdf_delete_before_after(
+    input_file="document.pdf",
+    before_page=10,   # deletes pages 1-9
+    after_page=None,
+    output_dir="output",
+)
+
+# Invert before/after (keep pages before/after, delete the rest)
+result = processor.process_pdf_delete_before_after(
+    input_file="document.pdf",
+    before_page=10,   # keeps pages 1-9
+    after_page=None,
+    output_dir="output",
+    invert_selection=True,
 )
 ```
 
 #### PDFProcessor Methods
 
-- `process_pdf(input_file, search_string, output_dir) -> ProcessingResult`
-  - Process a PDF file with trimming based on search string
-  - Returns processing result with success status and output path
+- `process_pdf(input_file, search_string, output_dir, invert_selection=False) -> ProcessingResult`
+    - Process a PDF file with trimming based on search string
+    - Returns processing result with success status and output path
+    - If `invert_selection=True`, keeps content starting at the match location (inverse trim)
+- `process_pdf_delete_pages(input_file, delete_spec, output_dir, invert_selection=False) -> ProcessingResult`
+    - Delete specific pages/ranges from a PDF (1-based spec like `"1-4,7"`)
+    - If `invert_selection=True`, treat `delete_spec` as a keep spec and delete all other pages
+- `process_pdf_delete_before_after(input_file, before_page, after_page, output_dir, invert_selection=False) -> ProcessingResult`
+    - Delete pages before/after a 1-based page number (before and after may be combined)
+    - If `invert_selection=True`, keep the pages that would otherwise be deleted and delete the rest
 
 ### TextSearchEngine
 
@@ -84,25 +118,41 @@ Orchestrates the complete PDF processing workflow.
 
 ```python
 from src.services.workflow_manager import WorkflowManager
+from src.models.operation_request import OperationRequest, OperationType
 
 manager = WorkflowManager(
-    pdf_processor=processor,
-    file_manager=file_service,
     display=display,
+    processor=processor,
+    file_manager=file_service,
     config=config
 )
 
-# Process single file
-success = manager.process_single_file("input.pdf", "search_text", "output")
+# Routed operation (preferred)
+success = manager.process_request(
+    OperationRequest(
+        operation=OperationType.SEARCH,
+        input_path="input.pdf",
+        is_batch_mode=False,
+        output_dir="output",
+        search_string="search_text",
+    )
+)
 
-# Process multiple files
-success = manager.process_files(["file1.pdf", "file2.pdf"], "search_text", "output")
+# Backwards compatible API (string-based)
+success = manager.process_operation(
+    operation="delete",
+    input_path="input.pdf",
+    is_batch_mode=False,
+    output_dir="output",
+    delete_spec="1-4,7",
+)
 ```
 
 #### WorkflowManager Methods
 
-- `process_single_file(input_file, search_string, output_dir) -> bool`
-- `process_files(input_files, search_string, output_dir) -> bool`
+- `process_request(request: OperationRequest) -> bool`: Preferred typed routing entrypoint
+- `process_operation(operation, input_path, output_dir, is_batch_mode, ...) -> bool`: Backwards-compatible routing entrypoint
+- `process_single_file(...)`, `process_batch(...)`, `process_workflow(...)`: Deprecated wrappers
 
 ## Data Models
 
@@ -114,15 +164,15 @@ Represents the outcome of a PDF processing operation.
 from src.models.result import ProcessingResult
 
 result = ProcessingResult(
+    success=True,
     input_file="input.pdf",
     output_file="output.pdf", 
-    success=True,
-    pages_removed=5,
-    pages_remaining=10,
-    search_string="Chapter 5",
+    message="(trimmed at page 5, blank pages removed)",
+    operation="search",
     search_found=True,
+    pages_trimmed=True,
+    trim_page=5,
     blank_pages_removed=2,
-    processing_time=1.5
 )
 ```
 
@@ -131,12 +181,25 @@ result = ProcessingResult(
 - `input_file: str`: Source file path
 - `output_file: str`: Generated output file path
 - `success: bool`: Whether processing succeeded
-- `pages_removed: int`: Number of pages removed
-- `pages_remaining: int`: Number of pages in output
-- `search_string: str`: Text that was searched for
-- `search_found: bool`: Whether search text was located
+- `message: str`: Human-readable summary
+- `operation: str`: Operation identifier (`"search"`, `"delete"`, `"before_after"`)
 - `blank_pages_removed: int`: Number of blank pages removed
-- `processing_time: float`: Processing duration in seconds
+
+Search-trim fields:
+- `pages_trimmed: bool`: Whether content was trimmed
+- `trim_page: Optional[int]`: 1-based page number where trimming occurred
+- `search_found: Optional[bool]`: True if search term found, False if not found
+
+Delete fields:
+- `pages_deleted: int`: Number of pages deleted
+- `deleted_pages: Optional[list[int]]`: 1-based deleted pages (sorted)
+- `delete_spec: Optional[str]`: Echo of the delete specification for delete-by-spec
+
+Keep (inverted delete) fields:
+- `invert_selection: bool`: True when `delete_spec` was treated as a keep spec
+- `keep_spec: Optional[str]`: Echo of the keep specification
+- `kept_pages: Optional[list[int]]`: 1-based kept pages (sorted)
+- `before_page: Optional[int]`, `after_page: Optional[int]`: Echo of before/after inputs
 
 ### ParsedArguments
 
@@ -146,19 +209,22 @@ Command-line argument parsing result.
 from src.ui.cli_handler import ParsedArguments
 
 args = ParsedArguments(
-    input_file="document.pdf",
+    input_path="document.pdf",
+    is_batch_mode=False,
+    operation="search",
     search_string="Chapter 5",
-    output_dir="output",
-    debug=False
 )
 ```
 
 #### ParsedArguments Properties
 
-- `input_file: Optional[str]`: Input PDF file (None for directory processing)
-- `search_string: str`: Text to search for
-- `output_dir: str`: Output directory path
-- `debug: bool`: Debug mode enabled
+- `input_path: str`: Input file path (or `"."` in batch mode)
+- `is_batch_mode: bool`: If True, process all PDFs in the current directory
+- `operation: str`: One of `"search"`, `"delete"`, `"before_after"`
+- `search_string: str`: Text to search for (search operation)
+- `delete_spec: Optional[str]`: Page/range deletion spec (delete operation)
+- `invert_selection: bool`: True when `--keep` was used (treat delete_spec as keep spec)
+- `before_page: Optional[int]`, `after_page: Optional[int]`: Before/after delete page numbers
 
 ### PDFDocument
 
@@ -340,6 +406,20 @@ controller = container.resolve(IApplicationController)
 
 # Process with command-line args
 exit_code = controller.run(["document.pdf", "Chapter 5"])
+```
+
+Updated CLI style (recommended):
+
+```python
+exit_code = controller.run(["-f", "document.pdf", "-s", "Chapter 5"])
+```
+
+Delete examples:
+
+```python
+exit_code = controller.run(["-f", "document.pdf", "-d", "1-4,7"])
+exit_code = controller.run(["-f", "document.pdf", "-b", "10"])  # delete pages 1-9
+exit_code = controller.run(["-f", "document.pdf", "-a", "10"])  # delete pages 11-end
 ```
 
 ### Custom Processing Pipeline

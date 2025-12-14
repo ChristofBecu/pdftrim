@@ -7,7 +7,7 @@ between CLI handling, processing, and output.
 """
 
 import sys
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from ..ui.cli_handler import ParsedArguments
@@ -17,6 +17,7 @@ from ..di.interfaces import (
     IFileManager, IPDFProcessor, IConfig
 )
 from ..services.workflow_manager import WorkflowManager
+from ..models.operation_request import OperationRequest, OperationType
 
 
 class ApplicationController(IApplicationController):
@@ -76,9 +77,9 @@ class ApplicationController(IApplicationController):
         """
         try:
             # Parse and validate command line arguments
-            parsed_args = self._parse_arguments(args)
+            parsed_args, early_exit_code = self._parse_arguments(args)
             if parsed_args is None:
-                return 0  # Help/version was displayed, normal exit
+                return early_exit_code  # help/version (0) or CLI error (non-zero)
             
             # Execute the appropriate workflow
             success = self._execute_workflow(parsed_args)
@@ -97,7 +98,7 @@ class ApplicationController(IApplicationController):
                 self.display.error(f"Traceback: {traceback.format_exc()}")
             return 1
     
-    def _parse_arguments(self, args: Optional[List[str]]) -> Optional['ParsedArguments']:
+    def _parse_arguments(self, args: Optional[List[str]]) -> Tuple[Optional['ParsedArguments'], int]:
         """
         Parse command line arguments using the CLI handler.
         
@@ -105,23 +106,14 @@ class ApplicationController(IApplicationController):
             args: Command line arguments
             
         Returns:
-            Parsed arguments object, or None if help/version was shown
+            (ParsedArguments or None, exit_code)
         """
-        # Import the CLIResult type
-        from .cli_handler import CLIResult
-        
-        # Use the new method that returns a result instead of calling sys.exit()
         result = self.cli_handler.handle_arguments_with_result(args)
         
         if result.should_exit:
-            # For help/version (exit code 0), return None to indicate normal exit
-            # For errors (exit code != 0), raise SystemExit to propagate the error
-            if result.exit_code == 0:
-                return None
-            else:
-                raise SystemExit(result.exit_code)
-        
-        return result.parsed_args
+            return None, result.exit_code
+
+        return result.parsed_args, 0
     
     def _execute_workflow(self, parsed_args) -> bool:
         """
@@ -137,23 +129,34 @@ class ApplicationController(IApplicationController):
             # Extract workflow parameters
             input_path = getattr(parsed_args, 'input_path', None)
             search_string = getattr(parsed_args, 'search_string', '')
+            operation = getattr(parsed_args, 'operation', 'search')
+            delete_spec = getattr(parsed_args, 'delete_spec', None)
+            invert_selection = getattr(parsed_args, 'invert_selection', False)
+            before_page = getattr(parsed_args, 'before_page', None)
+            after_page = getattr(parsed_args, 'after_page', None)
             output_dir = getattr(parsed_args, 'output_dir', None)
             is_batch_mode = getattr(parsed_args, 'is_batch_mode', False)
-            
-            # Validate required parameters
-            if not search_string.strip():
-                self.display.error("Search string cannot be empty")
-                return False
-            
-            # Execute workflow
-            success = self.workflow_manager.process_workflow(
+
+            request = OperationRequest(
+                operation=OperationType.from_string(operation),
                 input_path=input_path if not is_batch_mode else None,
-                search_string=search_string,
+                is_batch_mode=is_batch_mode,
                 output_dir=output_dir,
-                is_batch_mode=is_batch_mode
+                search_string=search_string,
+                delete_spec=(delete_spec or ""),
+                invert_selection=bool(invert_selection),
+                before_page=before_page,
+                after_page=after_page,
             )
-            
-            return success
+
+            try:
+                request.validate()
+            except ValueError as e:
+                # Defensive guard for programmatic use; CLI already validates.
+                self.display.error(str(e))
+                return False
+
+            return self.workflow_manager.process_request(request)
             
         except Exception as e:
             self.display.error(f"Workflow execution failed: {e}")
