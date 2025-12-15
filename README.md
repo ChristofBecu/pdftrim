@@ -2,6 +2,14 @@
 
 A Python utility for trimming and editing PDF documents via a text search cutoff or explicit page deletion (ranges, before/after), with batch processing and automatic blank-page removal.
 
+## Why
+
+I needed to print a lot of PDFs that all shared the same structure — each had different content of text and had identical pages with images at the end of the file which i did not want to be printed. Opening each file individually to select which pages to print was tedious and error-prone.
+
+The solution started as a quick Python script: bulk find a specific text string in the PDF's (the title where the images started) and automatically remove everything after it. That one-file python prototype worked perfectly - a simple command `python3 pdftrim "Foto's" && lp output/*.pdf`, +50 PDF's processed and printed. My work was done in a blink!
+
+But I saw potential to make it more useful : explicit page ranges, blank page detection and a cleaner architecture. What began as a one-day automation hack evolved into a flexible tool for common PDF manipulation tasks I occasionally need - or will need in the future.
+
 ## Features
 
 - **Text-based trimming**: Remove pages starting from a specific search string
